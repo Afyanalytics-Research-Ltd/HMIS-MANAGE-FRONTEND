@@ -53,17 +53,24 @@ export const useHospitalsStore = defineStore('hospitals', () => {
   const coreOrganizations = ref<CoreOrganization[]>([])
   const loadingCoreOrganizations = ref(false)
 
-  async function fetchList(page = 1, perPage = 25) {
+  // Bumped on every fetchList() so a slow, stale response (e.g. an earlier
+  // search keystroke) can't overwrite the results of a newer request.
+  let listRequestId = 0
+
+  async function fetchList(page = 1, perPage = 25, search = '') {
+    const requestId = ++listRequestId
     loading.value = true
     error.value = ''
     try {
-      const res = await api.list({ page, per_page: perPage })
+      const res = await api.list({ page, per_page: perPage, search: search.trim() || undefined })
+      if (requestId !== listRequestId) return
       items.value = res.data
       meta.value = res.meta
     } catch (err: any) {
+      if (requestId !== listRequestId) return
       error.value = err?.response?.data?.message || 'Failed to load hospitals.'
     } finally {
-      loading.value = false
+      if (requestId === listRequestId) loading.value = false
     }
   }
 
