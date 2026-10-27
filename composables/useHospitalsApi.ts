@@ -18,6 +18,7 @@ import type {
   UpdateAdminResponse,
   UpdateHospitalPayload,
   UpdateHospitalResponse,
+  V3Target,
 } from '~/types/hospital'
 
 /**
@@ -112,10 +113,19 @@ export function useHospitalsApi() {
 
   // Powers the "use existing organization" picker on Step 1 of the
   // register-hospital wizard. See HospitalController::coreOrganizations().
-  async function getCoreOrganizations(): Promise<CoreOrganization[]> {
-    const { data } = await $axios.get<{ data: CoreOrganization[] }>('/v1/platform/hospitals/core-organizations')
+  async function getCoreOrganizations(target?: string): Promise<CoreOrganization[]> {
+    const { data } = await $axios.get<{ data: CoreOrganization[] }>('/v1/platform/hospitals/core-organizations', {
+      params: target ? { target } : undefined,
+    })
     return data.data
   }
 
-  return { list, show, create, update, retryProvisioning, seedReferenceData, getSeedingStatus, provisionAdmin, linkAdmin, updateAdmin, addAdmin, removeAdmin, searchFacility, getCoreOrganizations }
+  // The v3 systems (production, data-migration, ...) a hospital can be
+  // provisioned into — feeds the "System" picker on the register wizard.
+  async function getV3Targets(): Promise<V3Target[]> {
+    const { data } = await $axios.get<{ data: V3Target[] }>('/v1/platform/hospitals/v3-targets')
+    return data.data
+  }
+
+  return { list, show, create, update, retryProvisioning, seedReferenceData, getSeedingStatus, provisionAdmin, linkAdmin, updateAdmin, addAdmin, removeAdmin, searchFacility, getCoreOrganizations, getV3Targets }
 }

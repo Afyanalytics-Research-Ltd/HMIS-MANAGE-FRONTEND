@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useHospitalsApi } from '~/composables/useHospitalsApi'
-import type { CoreOrganization, CreateAdminPayload, CreateHospitalPayload, CreateHospitalResponse, ExistingCoreAccount, Hospital, HospitalDetail, PaginationMeta, ProvisionAdminResponse, RetryProvisioningResponse, SeedingStatusResponse, UpdateAdminPayload, UpdateHospitalPayload } from '~/types/hospital'
+import type { CoreOrganization, CreateAdminPayload, CreateHospitalPayload, CreateHospitalResponse, ExistingCoreAccount, Hospital, HospitalDetail, PaginationMeta, ProvisionAdminResponse, RetryProvisioningResponse, SeedingStatusResponse, UpdateAdminPayload, UpdateHospitalPayload, V3Target } from '~/types/hospital'
 
 export const useHospitalsStore = defineStore('hospitals', () => {
   const api = useHospitalsApi()
@@ -53,6 +53,9 @@ export const useHospitalsStore = defineStore('hospitals', () => {
   // hospital wizard's "use existing organization" picker.
   const coreOrganizations = ref<CoreOrganization[]>([])
   const loadingCoreOrganizations = ref(false)
+  // The v3 systems a hospital can be provisioned into (production + any
+  // extra configured on the server) — drives the wizard's "System" picker.
+  const v3Targets = ref<V3Target[]>([])
 
   // Bumped on every fetchList() so a slow, stale response (e.g. an earlier
   // search keystroke) can't overwrite the results of a newer request.
@@ -91,14 +94,26 @@ export const useHospitalsStore = defineStore('hospitals', () => {
     }
   }
 
-  async function fetchCoreOrganizations() {
+  async function fetchCoreOrganizations(target?: string) {
     loadingCoreOrganizations.value = true
+    // Organizations belong to one system — never show another system's list
+    // while this one loads (or if it fails).
+    coreOrganizations.value = []
     try {
-      coreOrganizations.value = await api.getCoreOrganizations()
+      coreOrganizations.value = await api.getCoreOrganizations(target)
     } catch (err: any) {
       error.value = err?.response?.data?.message || 'Failed to load organizations.'
     } finally {
       loadingCoreOrganizations.value = false
+    }
+  }
+
+  async function fetchV3Targets() {
+    try {
+      v3Targets.value = await api.getV3Targets()
+    } catch {
+      // Not fatal: without the list the wizard just offers the default system.
+      v3Targets.value = []
     }
   }
 
@@ -381,8 +396,8 @@ export const useHospitalsStore = defineStore('hospitals', () => {
     provisioningAdminId, lastAdminProvisionResult, updatingAdminId, lastAdminUpdateResult, addingAdmin, removingAdminId,
     pendingCoreAccountLink, linkingAdmin,
     lastCreateResult, lastRetryResult, seeding, lastSeedResult,
-    coreOrganizations, loadingCoreOrganizations,
+    coreOrganizations, loadingCoreOrganizations, v3Targets,
     fetchList, fetchOne, create, update, retryProvisioning, seedReferenceData, provisionAdmin, linkAdmin, cancelCoreAccountLink, updateAdmin, addAdmin, removeAdmin, setActive,
-    fetchCoreOrganizations,
+    fetchCoreOrganizations, fetchV3Targets,
   }
 })

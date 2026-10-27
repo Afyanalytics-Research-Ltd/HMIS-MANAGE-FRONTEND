@@ -48,7 +48,15 @@ const form = reactive<CreateHospitalPayload>({
 const useExistingOrg = ref(false)
 const selectedCoreOrgId = ref<number | null>(null)
 
-store.fetchCoreOrganizations()
+// Which v3 system this hospital is provisioned into. '' until the list of
+// systems loads, then the default (production) one; only offered at all when
+// the server has more than one configured.
+const selectedTarget = ref('')
+const isDefaultTarget = computed(() => {
+  const t = store.v3Targets.find((x) => x.key === selectedTarget.value)
+  return !t || t.default
+})
+const selectedTargetLabel = computed(() => store.v3Targets.find((x) => x.key === selectedTarget.value)?.label ?? '')
 
 const addFacility = ref(true)
 const facility = reactive<HospitalFacilityPayload>({
@@ -147,6 +155,7 @@ function restoreDraft() {
     dhaStatusType.value = draft.dhaStatusType || 'info'
     useExistingOrg.value = !!draft.useExistingOrg
     selectedCoreOrgId.value = draft.selectedCoreOrgId ?? null
+    selectedTarget.value = draft.selectedTarget || ''
   } catch {
     sessionStorage.removeItem(DRAFT_KEY)
   }
@@ -158,8 +167,24 @@ function clearDraft() {
 
 restoreDraft()
 
+// Load the systems, then the existing-organization list for whichever one is
+// selected (a restored draft may already point at a non-default system).
+store.fetchV3Targets().then(() => {
+  if (!selectedTarget.value) selectedTarget.value = store.v3Targets.find((t) => t.default)?.key ?? ''
+})
+store.fetchCoreOrganizations(selectedTarget.value || undefined)
+
+// Organizations belong to one system: switching it clears the pick and
+// reloads the list. The first assignment ('' -> default, once the systems
+// load) isn't a switch — that list is already loaded.
+watch(selectedTarget, (target, previous) => {
+  if (!previous) return
+  selectedCoreOrgId.value = null
+  store.fetchCoreOrganizations(target || undefined)
+})
+
 watch(
-  [step, form, addFacility, facility, addAdmin, admin, adminPasswordLocked, dhaIdentifier, dhaMatched, dhaShaStatus, dhaStatus, dhaStatusType, useExistingOrg, selectedCoreOrgId],
+  [step, form, addFacility, facility, addAdmin, admin, adminPasswordLocked, dhaIdentifier, dhaMatched, dhaShaStatus, dhaStatus, dhaStatusType, useExistingOrg, selectedCoreOrgId, selectedTarget],
   () => {
     if (typeof window === 'undefined' || submitted.value) return
     sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
@@ -176,6 +201,7 @@ watch(
       dhaStatus: dhaStatus.value,
       useExistingOrg: useExistingOrg.value,
       selectedCoreOrgId: selectedCoreOrgId.value,
+      selectedTarget: selectedTarget.value,
       dhaStatusType: dhaStatusType.value,
     }))
   },
@@ -325,6 +351,7 @@ async function submit() {
   if (addAdmin.value) payload.admin = { ...admin }
   if (deploymentId) payload.deployment_id = deploymentId
   if (useExistingOrg.value && selectedCoreOrgId.value) payload.existing_core_org_id = selectedCoreOrgId.value
+  if (selectedTarget.value && !isDefaultTarget.value) payload.v3_target = selectedTarget.value
 
   const res = await store.create(payload)
   if (res.success) {
@@ -374,12 +401,32 @@ function done() {
       <div class="pa-6">
         <h3 class="text-h5 mb-4"><v-icon icon="mdi-check-circle" color="success" class="mr-2" />Hospital created</h3>
 
+        <!-- The core-service ids the rest of the platform knows this hospital by -->
+        <!-- (e.g. what a data load or integration needs) — shown here so they can be copied. -->
+        <v-card variant="tonal" color="success" rounded="lg" class="mb-4">
+          <v-card-text>
+            <p class="text-subtitle-2 font-weight-medium mb-3">
+              Created in {{ store.lastCreateResult.data.v3_target_label }}
+            </p>
+            <div class="d-flex align-center ga-2 mb-1">
+              <span class="text-body-2">Organization ID:</span>
+              <span class="font-mono font-weight-medium">{{ store.lastCreateResult.data.core_org_id || '—' }}</span>
+              <v-btn v-if="store.lastCreateResult.data.core_org_id" icon="mdi-content-copy" size="x-small" variant="text"
+                @click="copy(String(store.lastCreateResult.data.core_org_id))" />
+            </div>
+            <div class="d-flex align-center ga-2">
+              <span class="text-body-2">Facility ID:</span>
+              <span class="font-mono font-weight-medium">{{ store.lastCreateResult.facility?.core_facility_id || '—' }}</span>
+              <v-btn v-if="store.lastCreateResult.facility?.core_facility_id" icon="mdi-content-copy" size="x-small" variant="text"
+                @click="copy(String(store.lastCreateResult.facility.core_facility_id))" />
+            </div>
+          </v-card-text>
+        </v-card>
+
         <v-list density="comfortable" lines="two" class="mb-4">
           <v-list-item title="Facility">
             <template #subtitle>
-              {{ store.lastCreateResult.facility
-                ? `${store.lastCreateResult.facility.name} (core: ${store.lastCreateResult.facility.core_facility_id || '—'})`
-                : 'No facility created' }}
+              {{ store.lastCreateResult.facility ? store.lastCreateResult.facility.name : 'No facility created' }}
             </template>
           </v-list-item>
           <v-list-item title="Admin">
@@ -448,6 +495,13 @@ function done() {
                  this hmis-manage hospital record is called, in either mode —
                  selecting an existing organization only changes which
                  core-service org the facility/admin get provisioned into. -->
+            <!-- Which v3 system to provision into — only shown when the server
+                 has more than one configured (production + e.g. data migration). -->
+            <v-select v-if="store.v3Targets.length > 1" v-model="selectedTarget"
+              :items="store.v3Targets" item-title="label" item-value="key"
+              label="System *" variant="outlined" density="comfortable" class="mb-3" hide-details="auto"
+              hint="The v3 system this hospital's organization, facility and admin are created in." persistent-hint />
+
             <v-switch v-model="useExistingOrg" color="primary" hide-details inset density="compact"
               label="Attach to an existing organization" class="mb-3" />
 
@@ -515,8 +569,13 @@ function done() {
               <v-switch v-model="addFacility" color="primary" hide-details inset density="compact" label="Add a facility" />
             </div>
 
+            <v-alert v-if="!isDefaultTarget" type="info" variant="tonal" density="compact" class="mb-3">
+              The facility ID (DHA registry lookup and master facility code) is optional for {{ selectedTargetLabel }} —
+              just enter the facility name.
+            </v-alert>
+
             <div class="d-flex ga-2 mb-1" :class="{ 'opacity-50': !addFacility }">
-              <v-text-field v-model="dhaIdentifier" :disabled="!addFacility || dhaSearching" label="Find Facility (DHA Registry)"
+              <v-text-field v-model="dhaIdentifier" :disabled="!addFacility || dhaSearching" :label="isDefaultTarget ? 'Find Facility (DHA Registry)' : 'Find Facility (DHA Registry) — optional'"
                 placeholder="Facility ID / fr-code, e.g. FID-47-105963-0" variant="outlined" density="comfortable" hide-details="auto"
                 @keydown.enter.prevent="searchFacility" />
               <v-btn color="primary" variant="tonal" :disabled="!addFacility" :loading="dhaSearching" @click="searchFacility">
@@ -531,7 +590,7 @@ function done() {
             <v-text-field v-model="facility.name" :disabled="!addFacility" label="Facility name" placeholder="e.g. Main Hospital"
               variant="outlined" density="comfortable" class="mb-3" hide-details="auto" />
             <div class="d-flex ga-3 mb-3 flex-wrap">
-              <v-text-field v-model="facility.facility_code" :disabled="!addFacility" label="Master facility code" variant="outlined" density="comfortable" hide-details="auto" style="min-width:220px" />
+              <v-text-field v-model="facility.facility_code" :disabled="!addFacility" :label="isDefaultTarget ? 'Master facility code' : 'Master facility code (optional)'" variant="outlined" density="comfortable" hide-details="auto" style="min-width:220px" />
               <v-text-field v-model="facility.keph_level" :disabled="!addFacility" label="KEPH level" placeholder="e.g. Level 4" variant="outlined" density="comfortable" hide-details="auto" style="min-width:220px" />
             </div>
 

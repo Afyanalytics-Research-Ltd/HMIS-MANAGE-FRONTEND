@@ -29,6 +29,9 @@ export interface Hospital {
   status: HospitalStatus
   is_sandbox: boolean
   core_org_id: string | null
+  // Which v3 system this hospital was provisioned into (key + display label).
+  v3_target: string
+  v3_target_label: string
   created_at: string | null
   updated_at: string | null
 }
@@ -253,9 +256,20 @@ export interface CreateHospitalPayload {
   // tells core-service provisioning to attach the new facility/admin to an
   // organization that already exists there instead of minting a new one.
   existing_core_org_id?: number
+  // Key of the v3 system to provision into (GET /hospitals/v3-targets).
+  // Omitted = the default (production) system.
+  v3_target?: string
   // optional first facility + admin
   facility?: HospitalFacilityPayload
   admin?: { name: string; username: string; email: string; password: string }
+}
+
+// One row from GET /hospitals/v3-targets — a v3 system a hospital can be
+// provisioned into. `default` is the production system.
+export interface V3Target {
+  key: string
+  label: string
+  default: boolean
 }
 
 // One row from GET /hospitals/core-organizations — plain id/name/code/status,

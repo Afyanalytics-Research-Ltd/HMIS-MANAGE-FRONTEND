@@ -337,6 +337,7 @@ watch(
               <template v-if="h.core_org_id">
                 <v-chip color="success" variant="flat" label class="mb-2">Provisioned</v-chip>
                 <v-list density="compact" lines="two">
+                  <v-list-item title="System" :subtitle="h.v3_target_label" />
                   <v-list-item title="Core org ID" :subtitle="h.core_org_id" />
                 </v-list>
 
@@ -398,6 +399,7 @@ watch(
             </v-card-item>
             <v-card-text>
               <v-list density="compact" lines="two">
+                <v-list-item title="Core facility ID" :subtitle="f.core_facility_id || '—'" />
                 <v-list-item title="Facility code" :subtitle="f.facility_code || '—'" />
                 <v-list-item title="KEPH level" :subtitle="f.keph_level || '—'" />
               </v-list>
