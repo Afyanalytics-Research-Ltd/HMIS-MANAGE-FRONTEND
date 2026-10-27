@@ -137,6 +137,17 @@ async function saveNewFacility() {
   }
 }
 
+async function retryFacility(facilityId: string) {
+  const res = await store.provisionFacility(id.value, facilityId)
+  if (res.success) {
+    $showToast(
+      res.data.core_provisioned
+        ? 'Facility created in the v3 system.'
+        : 'Still not created in the v3 system: ' + (res.data.core_provisioning_error || 'unknown error'),
+    )
+  }
+}
+
 const addAdminDialog = ref(false)
 const addAdminForm = reactive({ name: '', username: '', email: '', password: '' })
 const showAddAdminPassword = ref(false)
@@ -456,6 +467,12 @@ watch(
                 <v-chip :color="f.core_facility_id ? 'success' : 'warning'" size="small" variant="tonal" label>
                   {{ f.core_facility_id ? 'Provisioned' : 'Not in core-service' }}
                 </v-chip>
+                <v-btn
+                  v-if="!f.core_facility_id && h.core_org_id" size="small" color="primary" variant="tonal" class="ml-2"
+                  prepend-icon="mdi-cloud-sync" :loading="store.provisioningFacilityId === f.id" @click="retryFacility(f.id)"
+                >
+                  Retry
+                </v-btn>
               </template>
             </v-card-item>
             <v-card-text>

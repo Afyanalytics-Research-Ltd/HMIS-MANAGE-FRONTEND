@@ -354,6 +354,25 @@ export const useHospitalsStore = defineStore('hospitals', () => {
     }
   }
 
+  const provisioningFacilityId = ref<string | null>(null)
+  async function provisionFacility(orgId: string, facilityId: string) {
+    provisioningFacilityId.value = facilityId
+    error.value = ''
+    try {
+      const res = await api.provisionFacility(orgId, facilityId)
+      if (current.value) {
+        const i = current.value.facilities.findIndex((f) => f.id === facilityId)
+        if (i !== -1) current.value.facilities[i] = res.data
+      }
+      return { success: true as const, data: res }
+    } catch (err: any) {
+      error.value = err?.response?.data?.message || 'Failed to provision facility.'
+      return { success: false as const }
+    } finally {
+      provisioningFacilityId.value = null
+    }
+  }
+
   async function addAdmin(orgId: string, payload: CreateAdminPayload) {
     addingAdmin.value = true
     error.value = ''
@@ -409,11 +428,11 @@ export const useHospitalsStore = defineStore('hospitals', () => {
 
   return {
     items, meta, current, loading, error, saving, retrying, togglingStatus, fieldErrors,
-    provisioningAdminId, lastAdminProvisionResult, updatingAdminId, lastAdminUpdateResult, addingAdmin, addingFacility, removingAdminId,
+    provisioningAdminId, lastAdminProvisionResult, updatingAdminId, lastAdminUpdateResult, addingAdmin, addingFacility, provisioningFacilityId, removingAdminId,
     pendingCoreAccountLink, linkingAdmin,
     lastCreateResult, lastRetryResult, seeding, lastSeedResult,
     coreOrganizations, loadingCoreOrganizations, v3Targets,
-    fetchList, fetchOne, create, update, retryProvisioning, seedReferenceData, provisionAdmin, linkAdmin, cancelCoreAccountLink, updateAdmin, addAdmin, addFacility, removeAdmin, setActive,
+    fetchList, fetchOne, create, update, retryProvisioning, seedReferenceData, provisionAdmin, linkAdmin, cancelCoreAccountLink, updateAdmin, addAdmin, addFacility, provisionFacility, removeAdmin, setActive,
     fetchCoreOrganizations, fetchV3Targets,
   }
 })
