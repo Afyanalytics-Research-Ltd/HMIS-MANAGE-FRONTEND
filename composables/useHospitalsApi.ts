@@ -1,7 +1,9 @@
 import { useNuxtApp } from '#app'
 import type {
   CoreOrganization,
+  AddFacilityResponse,
   CreateAdminPayload,
+  HospitalFacilityPayload,
   CreateAdminResponse,
   CreateHospitalPayload,
   CreateHospitalResponse,
@@ -68,6 +70,11 @@ export function useHospitalsApi() {
     return data
   }
 
+  async function addFacility(id: string, payload: HospitalFacilityPayload): Promise<AddFacilityResponse> {
+    const { data } = await $axios.post<AddFacilityResponse>(`/v1/platform/hospitals/${id}/facilities`, payload)
+    return data
+  }
+
   async function addAdmin(id: string, payload: CreateAdminPayload): Promise<CreateAdminResponse> {
     const { data } = await $axios.post<CreateAdminResponse>(`/v1/platform/hospitals/${id}/admins`, payload)
     return data
@@ -127,5 +134,5 @@ export function useHospitalsApi() {
     return data.data
   }
 
-  return { list, show, create, update, retryProvisioning, seedReferenceData, getSeedingStatus, provisionAdmin, linkAdmin, updateAdmin, addAdmin, removeAdmin, searchFacility, getCoreOrganizations, getV3Targets }
+  return { list, show, create, update, retryProvisioning, seedReferenceData, getSeedingStatus, provisionAdmin, linkAdmin, updateAdmin, addAdmin, addFacility, removeAdmin, searchFacility, getCoreOrganizations, getV3Targets }
 }

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useHospitalsApi } from '~/composables/useHospitalsApi'
-import type { CoreOrganization, CreateAdminPayload, CreateHospitalPayload, CreateHospitalResponse, ExistingCoreAccount, Hospital, HospitalDetail, PaginationMeta, ProvisionAdminResponse, RetryProvisioningResponse, SeedingStatusResponse, UpdateAdminPayload, UpdateHospitalPayload, V3Target } from '~/types/hospital'
+import type { CoreOrganization, CreateAdminPayload, CreateHospitalPayload, CreateHospitalResponse, ExistingCoreAccount, Hospital, HospitalFacilityPayload, HospitalDetail, PaginationMeta, ProvisionAdminResponse, RetryProvisioningResponse, SeedingStatusResponse, UpdateAdminPayload, UpdateHospitalPayload, V3Target } from '~/types/hospital'
 
 export const useHospitalsStore = defineStore('hospitals', () => {
   const api = useHospitalsApi()
@@ -338,6 +338,22 @@ export const useHospitalsStore = defineStore('hospitals', () => {
     }
   }
 
+  const addingFacility = ref(false)
+  async function addFacility(orgId: string, payload: HospitalFacilityPayload) {
+    addingFacility.value = true
+    error.value = ''
+    try {
+      const res = await api.addFacility(orgId, payload)
+      if (current.value) current.value.facilities.push(res.data)
+      return { success: true as const, data: res }
+    } catch (err: any) {
+      error.value = err?.response?.data?.message || 'Failed to add facility.'
+      return { success: false as const }
+    } finally {
+      addingFacility.value = false
+    }
+  }
+
   async function addAdmin(orgId: string, payload: CreateAdminPayload) {
     addingAdmin.value = true
     error.value = ''
@@ -393,11 +409,11 @@ export const useHospitalsStore = defineStore('hospitals', () => {
 
   return {
     items, meta, current, loading, error, saving, retrying, togglingStatus, fieldErrors,
-    provisioningAdminId, lastAdminProvisionResult, updatingAdminId, lastAdminUpdateResult, addingAdmin, removingAdminId,
+    provisioningAdminId, lastAdminProvisionResult, updatingAdminId, lastAdminUpdateResult, addingAdmin, addingFacility, removingAdminId,
     pendingCoreAccountLink, linkingAdmin,
     lastCreateResult, lastRetryResult, seeding, lastSeedResult,
     coreOrganizations, loadingCoreOrganizations, v3Targets,
-    fetchList, fetchOne, create, update, retryProvisioning, seedReferenceData, provisionAdmin, linkAdmin, cancelCoreAccountLink, updateAdmin, addAdmin, removeAdmin, setActive,
+    fetchList, fetchOne, create, update, retryProvisioning, seedReferenceData, provisionAdmin, linkAdmin, cancelCoreAccountLink, updateAdmin, addAdmin, addFacility, removeAdmin, setActive,
     fetchCoreOrganizations, fetchV3Targets,
   }
 })

@@ -5,7 +5,7 @@ import { useNuxtApp } from '#app'
 import { useHospitalsStore } from '@/stores/hospitals'
 import { useAuthStore } from '@/stores/auth'
 import { useDeploymentsStore } from '@/stores/deployments'
-import { STATUS_COLOR, TIER_COLOR, BILLING_COLOR, type HospitalAdminUser } from '@/types/hospital'
+import { STATUS_COLOR, TIER_COLOR, BILLING_COLOR, type HospitalAdminUser, type HospitalFacilityPayload } from '@/types/hospital'
 import type { Deployment } from '@/types/deployment'
 import ApiCredentialsCard from '@/components/hospitals/ApiCredentialsCard.vue'
 
@@ -106,6 +106,33 @@ async function saveAdminEdit() {
         : res.notified
           ? 'Admin details updated — confirmation email sent.'
           : 'Admin details updated.',
+    )
+  }
+}
+
+const addFacilityDialog = ref(false)
+const addFacilityForm = reactive({ name: '', facility_code: '', keph_level: '', total_beds: undefined as number | undefined })
+
+function openAddFacility() {
+  addFacilityForm.name = ''
+  addFacilityForm.facility_code = ''
+  addFacilityForm.keph_level = ''
+  addFacilityForm.total_beds = undefined
+  addFacilityDialog.value = true
+}
+
+async function saveNewFacility() {
+  const payload: HospitalFacilityPayload = { name: addFacilityForm.name.trim() }
+  if (addFacilityForm.facility_code.trim()) payload.facility_code = addFacilityForm.facility_code.trim()
+  if (addFacilityForm.keph_level.trim()) payload.keph_level = addFacilityForm.keph_level.trim()
+  if (typeof addFacilityForm.total_beds === 'number') payload.total_beds = addFacilityForm.total_beds
+  const res = await store.addFacility(id.value, payload)
+  if (res.success) {
+    addFacilityDialog.value = false
+    $showToast(
+      res.data.core_provisioned
+        ? 'Facility added.'
+        : 'Facility saved here, but not created in the v3 system: ' + (res.data.core_provisioning_error || 'unknown error'),
     )
   }
 }
@@ -415,6 +442,11 @@ watch(
       </v-row>
 
       <!-- 6. Facilities (bed capacity + facility administrator, from provisioning) -->
+      <div class="d-flex align-center mt-6 mb-2">
+        <h3 class="text-h6 mb-0">Facilities</h3>
+        <v-spacer />
+        <v-btn color="primary" variant="tonal" prepend-icon="mdi-plus" @click="openAddFacility">Add facility</v-btn>
+      </div>
       <v-row v-if="h.facilities?.length">
         <v-col v-for="f in h.facilities" :key="f.id" cols="12" md="6">
           <v-card rounded="lg" elevation="10" class="h-100">
@@ -632,6 +664,29 @@ watch(
           <v-btn color="primary" variant="flat" :loading="store.updatingAdminId === editingAdmin?.id"
             :disabled="!!editAdminForm.password && editAdminForm.password.length < 8" @click="saveAdminEdit">
             Save
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Add facility dialog -->
+    <v-dialog v-model="addFacilityDialog" max-width="480">
+      <v-card rounded="lg">
+        <v-card-title class="text-h6">Add facility</v-card-title>
+        <v-card-text>
+          <p class="text-body-2 textSecondary mb-4">
+            Created under this hospital's organization{{ h?.v3_target_label ? ' in ' + h.v3_target_label : '' }}. v3 assigns the facility ID automatically.
+          </p>
+          <v-text-field v-model="addFacilityForm.name" label="Facility name" variant="outlined" density="comfortable" class="mb-3" hide-details="auto" autofocus />
+          <v-text-field v-model="addFacilityForm.facility_code" label="Master facility code (optional)" variant="outlined" density="comfortable" class="mb-3" hide-details="auto" />
+          <v-text-field v-model="addFacilityForm.keph_level" label="KEPH level (optional)" placeholder="e.g. Level 4" variant="outlined" density="comfortable" class="mb-3" hide-details="auto" />
+          <v-text-field v-model.number="addFacilityForm.total_beds" type="number" label="Total beds (optional)" variant="outlined" density="comfortable" hide-details="auto" />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" :disabled="store.addingFacility" @click="addFacilityDialog = false">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" :loading="store.addingFacility" :disabled="!addFacilityForm.name.trim()" @click="saveNewFacility">
+            Add facility
           </v-btn>
         </v-card-actions>
       </v-card>

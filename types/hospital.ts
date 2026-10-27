@@ -318,6 +318,14 @@ export interface CreateHospitalResponse {
   core_provisioning_error: string | null
 }
 
+// Response of POST /v1/platform/hospitals/{id}/facilities (add a facility to
+// an existing hospital).
+export interface AddFacilityResponse {
+  data: HospitalFacility
+  core_provisioned: boolean
+  core_provisioning_error: string | null
+}
+
 // Response of POST /v1/platform/hospitals/{id}/provision (retry).
 export interface RetryProvisioningResponse {
   data: Hospital
