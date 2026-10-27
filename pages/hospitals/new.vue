@@ -117,6 +117,10 @@ function onAdminNameInput() {
 
 watch(step, (s) => {
   if (s === 4 && addAdmin.value && !admin.password) regeneratePassword()
+  // Most hospitals have one facility named after the hospital — start there
+  // (still editable). A facility is what the admin is assigned to, and without
+  // one the admin is never created in the v3 system.
+  if (s === 3 && addFacility.value && !facility.name.trim()) facility.name = form.name.trim()
 })
 
 // DHA SHA HIE facility registry lookup — see ShaHieClient / HospitalController::searchFacility.
@@ -298,8 +302,11 @@ const allFieldErrors = computed(() => Object.values(store.fieldErrors).flat())
 const step1Valid = computed(() =>
   form.name.trim().length > 0 && (!useExistingOrg.value || selectedCoreOrgId.value !== null),
 )
+// An admin is assigned to the facility; no facility = no admin in the v3 system.
+const adminNeedsFacility = computed(() => addAdmin.value && !(addFacility.value && facility.name.trim()))
 const step4Valid = computed(() => {
   if (!addAdmin.value) return true
+  if (adminNeedsFacility.value) return false
   return (
     admin.name.trim() &&
     admin.username.trim() &&
@@ -360,7 +367,8 @@ async function submit() {
   } else {
     // Jump back to the step that has the first error.
     const errs = Object.keys(store.fieldErrors)
-    if (errs.some((e) => e.startsWith('admin'))) step.value = 4
+    if (errs.some((e) => e.startsWith('facility'))) step.value = 3
+    else if (errs.some((e) => e.startsWith('admin'))) step.value = 4
     else if (errs.some((e) => ['subdomain', 'custom_domain', 'subscription_tier', 'billing_status', 'max_user_slots', 'max_patient_records', 'status'].includes(e))) step.value = 2
     else step.value = 1
   }
@@ -460,6 +468,15 @@ function done() {
             </p>
           </v-card-text>
         </v-card>
+
+        <!-- Hospital synced, but the admin account isn't in the v3 system: the login above won't work there yet. -->
+        <v-alert v-if="store.lastCreateResult.admin && store.lastCreateResult.admin_core_provisioned === false"
+          type="warning" variant="tonal" class="mb-2">
+          <p class="font-weight-medium mb-1">This admin can't log in to {{ store.lastCreateResult.data.v3_target_label }} yet.</p>
+          <p class="text-body-2 mb-0">
+            Their account exists in hmis-manage only. Open the hospital and provision the admin from its Admins section.
+          </p>
+        </v-alert>
 
         <v-alert v-if="provisioningState === 'success'" type="success" variant="tonal" class="mb-2">
           Synced to core-service.
@@ -634,6 +651,10 @@ function done() {
               <h3 class="text-h6"><v-icon icon="mdi-account-tie" class="mr-2" />Hospital Admin</h3>
               <v-switch v-model="addAdmin" color="primary" hide-details inset density="compact" label="Create admin" />
             </div>
+            <v-alert v-if="adminNeedsFacility" type="warning" variant="tonal" density="compact" class="mb-3">
+              The admin is assigned to a facility, so one is needed. Go back to the Facility step and add a facility name —
+              or turn off "Create admin" and add both later from the hospital page.
+            </v-alert>
             <v-text-field v-model="admin.name" :disabled="!addAdmin" label="Full name" variant="outlined" density="comfortable"
               :error-messages="fieldError('admin.name')" class="mb-3" hide-details="auto" @blur="onAdminNameInput" />
             <v-text-field v-model="admin.username" :disabled="!addAdmin" label="Username" variant="outlined" density="comfortable"

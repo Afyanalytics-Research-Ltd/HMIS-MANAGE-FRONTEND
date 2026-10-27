@@ -53,6 +53,10 @@ async function copyAdminField(text: string, field: 'username' | 'password') {
   setTimeout(() => (copiedAdminField.value = null), 1500)
 }
 
+async function copyId(value: string | number) {
+  await navigator.clipboard.writeText(String(value))
+}
+
 function provisionAdmin(adminId: number) {
   store.provisionAdmin(id.value, adminId)
 }
@@ -238,6 +242,31 @@ watch(
           <v-chip v-if="h.is_sandbox" color="warning" variant="tonal" label>SANDBOX</v-chip>
         </div>
       </div>
+
+      <!-- The ids the rest of the platform knows this hospital by — always visible, copyable. -->
+      <v-card variant="tonal" color="primary" rounded="lg" class="mb-6">
+        <v-card-text class="d-flex flex-wrap align-center ga-6">
+          <div>
+            <p class="text-caption textSecondary mb-0">System</p>
+            <p class="text-body-1 font-weight-medium mb-0">{{ h.v3_target_label }}</p>
+          </div>
+          <div>
+            <p class="text-caption textSecondary mb-0">Organization ID</p>
+            <p class="text-body-1 font-weight-medium font-mono mb-0">
+              {{ h.core_org_id || 'Not provisioned' }}
+              <v-btn v-if="h.core_org_id" icon="mdi-content-copy" size="x-small" variant="text" @click="copyId(h.core_org_id)" />
+            </p>
+          </div>
+          <div v-for="f in h.facilities" :key="f.id">
+            <p class="text-caption textSecondary mb-0">Facility ID — {{ f.name }}</p>
+            <p class="text-body-1 font-weight-medium font-mono mb-0">
+              {{ f.core_facility_id || 'Not provisioned' }}
+              <v-btn v-if="f.core_facility_id" icon="mdi-content-copy" size="x-small" variant="text" @click="copyId(f.core_facility_id)" />
+            </p>
+          </div>
+          <p v-if="!h.facilities?.length" class="text-body-2 mb-0">No facility yet — add one below to get a facility ID.</p>
+        </v-card-text>
+      </v-card>
 
       <v-row>
         <!-- 1. Isolation -->

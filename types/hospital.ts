@@ -312,6 +312,9 @@ export interface CreateHospitalResponse {
   facility: { id: string; name: string; core_facility_id: string | null } | null
   admin: { id: number; username: string; email: string } | null
   core_provisioned: boolean
+  // Whether the admin account exists in the v3 system (null = no admin was
+  // created). false = they can't log in there yet.
+  admin_core_provisioned: boolean | null
   core_provisioning_error: string | null
 }
 
