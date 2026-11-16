@@ -89,9 +89,7 @@ export interface GroupedReport {
   ticket_id: string
   reference: string | null
   reporter: string | null
-  reporter_email?: string | null
-  /** 'hmis' when hospital staff raised it from inside the HMIS. */
-  source?: 'manage' | 'hmis'
+  /** Set when hospital staff raised it from inside the HMIS. */
   organization?: string | null
   facility?: string | null
   description: string
@@ -112,9 +110,7 @@ export interface ReportSummary {
   severity: Severity | null
   status: ReportStatus
   reporter: string | null
-  reporter_email?: string | null
-  /** 'hmis' when hospital staff raised it from inside the HMIS. */
-  source?: 'manage' | 'hmis'
+  /** Set when hospital staff raised it from inside the HMIS. */
   organization?: string | null
   facility?: string | null
   assigned_to: number | null
