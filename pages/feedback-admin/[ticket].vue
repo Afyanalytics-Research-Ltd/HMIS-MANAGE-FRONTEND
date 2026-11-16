@@ -46,7 +46,7 @@ const internal = ref(false)
 
 // Raised inside the HMIS by hospital staff: there is no account here to reply
 // to, so what is written on the ticket is always a note for the team.
-const fromHmis = computed(() => !!report.value?.organization)
+const fromHmis = computed(() => !!report.value?.is_client)
 const preview = ref<{ url: string; original_name: string } | null>(null)
 const sending = ref(false)
 
@@ -209,7 +209,7 @@ onMounted(load)
               <v-chip :color="report.type === 'bug' ? 'error' : report.type === 'observation' ? 'teal' : 'primary'" size="small" variant="tonal" label>
                 {{ report.type === 'bug' ? 'Bug' : report.type === 'observation' ? 'Observation' : 'Feature' }}
               </v-chip>
-              <v-chip v-if="fromHmis" size="small" variant="tonal" label prepend-icon="mdi-hospital-building">HMIS</v-chip>
+              <v-chip v-if="fromHmis" size="small" variant="tonal" label prepend-icon="mdi-hospital-building">Client</v-chip>
               <v-chip v-if="report.severity" :color="SEVERITY_COLORS[report.severity as Severity]" size="small" variant="tonal" label class="text-capitalize">{{ report.severity }}</v-chip>
               <v-spacer />
               <span class="text-caption textSecondary font-mono">{{ report.reference || report.ticket_id.slice(0, 8) }}</span>
