@@ -89,8 +89,12 @@ export interface GroupedReport {
   ticket_id: string
   reference: string | null
   reporter: string | null
-  /** Raised by a client (hospital staff, from inside the HMIS) rather than by the team. */
-  is_client?: boolean
+  /** client: came from the HMIS platform. Everything else is general. */
+  source?: 'general' | 'client'
+  /** HMIS ids kept on a client ticket; the names beside them are read from core-service when shown. */
+  organization_id?: number | null
+  facility_id?: number | null
+  reporter_id?: number | null
   organization?: string | null
   facility?: string | null
   description: string
@@ -111,8 +115,12 @@ export interface ReportSummary {
   severity: Severity | null
   status: ReportStatus
   reporter: string | null
-  /** Raised by a client (hospital staff, from inside the HMIS) rather than by the team. */
-  is_client?: boolean
+  /** client: came from the HMIS platform. Everything else is general. */
+  source?: 'general' | 'client'
+  /** HMIS ids kept on a client ticket; the names beside them are read from core-service when shown. */
+  organization_id?: number | null
+  facility_id?: number | null
+  reporter_id?: number | null
   organization?: string | null
   facility?: string | null
   assigned_to: number | null
