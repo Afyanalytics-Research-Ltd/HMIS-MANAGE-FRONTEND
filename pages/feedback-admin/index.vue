@@ -18,7 +18,7 @@ const deleting = ref(false)
 
 const filters = reactive({
   search: '', status: null as string | null, type: null as string | null,
-  module: null as string | null, severity: null as string | null,
+  module: null as string | null, severity: null as string | null, source: null as string | null,
   date_from: '', date_to: '',
 })
 
@@ -39,6 +39,10 @@ const typeItems = [
   { title: 'All types', value: null as any },
   { title: 'Bug', value: 'bug' }, { title: 'Feature', value: 'feature' }, { title: 'Observation', value: 'observation' },
 ]
+const sourceItems = [
+  { title: 'All tickets', value: null as any },
+  { title: 'Client', value: 'client' }, { title: 'General', value: 'general' },
+]
 const moduleItems = [{ title: 'All modules', value: null as any }, ...MODULES.map((m) => ({ title: m, value: m }))]
 const severityItems = [{ title: 'All severities', value: null as any }, ...SEVERITIES.map((s) => ({ title: s, value: s }))]
 
@@ -48,6 +52,7 @@ const headers = [
   { title: 'Title', key: 'title', sortable: false },
   { title: 'Module', key: 'module', sortable: false },
   { title: 'Severity', key: 'severity', sortable: false },
+  { title: 'Organization', key: 'organization', sortable: false },
   { title: 'Reporter', key: 'reporter', sortable: false },
   { title: 'Status', key: 'status', sortable: false },
   { title: 'Submitted', key: 'created_at', sortable: false },
@@ -95,7 +100,7 @@ function applyFilters() {
 }
 
 function clearFilters() {
-  Object.assign(filters, { search: '', status: null, type: null, module: null, severity: null, date_from: '', date_to: '' })
+  Object.assign(filters, { search: '', status: null, type: null, module: null, severity: null, source: null, date_from: '', date_to: '' })
   applyFilters()
 }
 
@@ -133,10 +138,13 @@ function clearFilters() {
           <v-col cols="6" md="2">
             <v-select v-model="filters.severity" :items="severityItems" label="Severity" variant="outlined" density="comfortable" hide-details class="text-capitalize" />
           </v-col>
-          <v-col cols="6" md="3">
+          <v-col cols="6" md="2">
+            <v-select v-model="filters.source" :items="sourceItems" label="Source" variant="outlined" density="comfortable" hide-details />
+          </v-col>
+          <v-col cols="6" md="2">
             <v-text-field v-model="filters.date_from" type="date" label="From" variant="outlined" density="comfortable" hide-details />
           </v-col>
-          <v-col cols="6" md="3">
+          <v-col cols="6" md="2">
             <v-text-field v-model="filters.date_to" type="date" label="To" variant="outlined" density="comfortable" hide-details />
           </v-col>
           <v-col cols="12" md="6" class="d-flex align-center ga-2">
@@ -159,7 +167,6 @@ function clearFilters() {
         density="comfortable" hover
         @update:options="load"
         @click:row="(_e: any, { item }: any) => router.push(`/feedback-admin/${item.ticket_id}?from=${encodeURIComponent('/feedback-admin')}`)">
-        <template #item.ticket_id="{ item }"><span class="font-mono text-caption">{{ item.ticket_id.slice(0, 8) }}</span></template>
         <template #item.type="{ item }">
           <v-chip :color="item.type === 'bug' ? 'error' : item.type === 'observation' ? 'teal' : 'primary'" size="small" variant="tonal" label>
             <v-icon start :icon="item.type === 'bug' ? 'mdi-bug' : item.type === 'observation' ? 'mdi-eye' : 'mdi-lightbulb-on'" size="14" />
@@ -168,10 +175,20 @@ function clearFilters() {
         </template>
         <template #item.title="{ item }">
           <span class="font-weight-medium">{{ item.title }}</span>
+          <v-chip v-if="item.source === 'client'" size="x-small" variant="tonal" label class="ml-2">Client</v-chip>
           <v-chip v-if="item.duplicate_count" size="x-small" color="warning" variant="tonal" label class="ml-2">
             <v-icon start icon="mdi-account-multiple" size="11" />{{ item.duplicate_count + 1 }} reports
           </v-chip>
         </template>
+        <template #item.organization="{ item }">
+          <template v-if="item.organization">
+            <div>{{ item.organization }}</div>
+            <div v-if="item.facility" class="text-caption textSecondary">{{ item.facility }}</div>
+          </template>
+          <span v-else class="textSecondary">—</span>
+        </template>
+        <template #item.ticket_id="{ item }"><span class="font-mono text-caption">{{ item.reference || item.ticket_id.slice(0, 8) }}</span></template>
+        <template #item.reporter="{ item }">{{ item.source === 'client' ? item.reporter_name : item.reporter }}</template>
         <template #item.severity="{ item }">
           <span v-if="item.severity" class="text-capitalize">{{ item.severity }}</span>
           <span v-else class="textSecondary">—</span>
