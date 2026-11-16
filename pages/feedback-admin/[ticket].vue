@@ -46,7 +46,7 @@ const internal = ref(false)
 
 // Raised inside the HMIS by hospital staff: there is no account here to reply
 // to, so what is written on the ticket is always a note for the team.
-const fromHmis = computed(() => !!report.value?.is_client)
+const fromHmis = computed(() => report.value?.source === 'client')
 const preview = ref<{ url: string; original_name: string } | null>(null)
 const sending = ref(false)
 
