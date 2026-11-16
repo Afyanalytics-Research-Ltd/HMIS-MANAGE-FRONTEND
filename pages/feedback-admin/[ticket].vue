@@ -43,6 +43,11 @@ const savingStatus = ref(false)
 
 const reply = ref('')
 const internal = ref(false)
+
+// Raised inside the HMIS by hospital staff: there is no account here to reply
+// to, so what is written on the ticket is always a note for the team.
+const fromHmis = computed(() => report.value?.source === 'hmis')
+const preview = ref<{ url: string; original_name: string } | null>(null)
 const sending = ref(false)
 
 const confirmDelete = ref(false)
@@ -173,10 +178,11 @@ async function send() {
   if (!reply.value.trim() || sending.value) return
   sending.value = true
   try {
-    const c = await api.adminComment(ticket.value, reply.value.trim(), internal.value)
+    const asNote = fromHmis.value || internal.value
+    const c = await api.adminComment(ticket.value, reply.value.trim(), asNote)
     report.value?.comments.push(c)
     reply.value = ''
-    $showToast(internal.value ? 'Internal note added.' : 'Reply sent to user.')
+    $showToast(asNote ? 'Note added.' : 'Reply sent to user.')
   } catch (e: any) {
     $showToast(e?.response?.data?.message || 'Failed to send.')
   } finally {
@@ -200,17 +206,33 @@ onMounted(load)
         <v-card rounded="xl" elevation="10" class="mb-4">
           <v-card-text class="pa-6">
             <div class="d-flex flex-wrap align-center ga-2 mb-2">
-              <v-chip :color="report.type === 'bug' ? 'error' : 'primary'" size="small" variant="tonal" label>
-                {{ report.type === 'bug' ? 'Bug' : 'Feature' }}
+              <v-chip :color="report.type === 'bug' ? 'error' : report.type === 'observation' ? 'teal' : 'primary'" size="small" variant="tonal" label>
+                {{ report.type === 'bug' ? 'Bug' : report.type === 'observation' ? 'Observation' : 'Feature' }}
               </v-chip>
+              <v-chip v-if="fromHmis" size="small" variant="tonal" label prepend-icon="mdi-hospital-building">HMIS</v-chip>
               <v-chip v-if="report.severity" :color="SEVERITY_COLORS[report.severity as Severity]" size="small" variant="tonal" label class="text-capitalize">{{ report.severity }}</v-chip>
               <v-spacer />
-              <span class="text-caption textSecondary font-mono">{{ report.ticket_id.slice(0, 8) }}</span>
+              <span class="text-caption textSecondary font-mono">{{ report.reference || report.ticket_id.slice(0, 8) }}</span>
             </div>
             <h2 class="text-h5 font-weight-semibold mb-1">{{ report.title }}</h2>
             <p class="text-caption textSecondary mb-4">
               {{ report.module }} · by {{ report.reporter }} · {{ fmt(report.created_at) }}
             </p>
+            <div v-if="fromHmis" class="raised-by mb-4">
+              <div>
+                <div class="text-caption textSecondary">Organization</div>
+                <div class="text-body-2 font-weight-medium">{{ report.organization || '—' }}</div>
+              </div>
+              <div>
+                <div class="text-caption textSecondary">Facility</div>
+                <div class="text-body-2 font-weight-medium">{{ report.facility || '—' }}</div>
+              </div>
+              <div>
+                <div class="text-caption textSecondary">Reported by</div>
+                <div class="text-body-2 font-weight-medium">{{ report.reporter || '—' }}</div>
+                <div v-if="report.reporter_email" class="text-caption textSecondary">{{ report.reporter_email }}</div>
+              </div>
+            </div>
             <v-alert
               v-if="report.test_case" type="info" variant="tonal" density="compact" class="mb-3"
               icon="mdi-link-variant"
@@ -279,10 +301,11 @@ onMounted(load)
           <v-card-item><v-card-title class="text-subtitle-1">Attachments</v-card-title></v-card-item>
           <v-card-text>
             <div class="d-flex flex-wrap ga-3">
-              <a v-for="a in report.attachments" :key="a.id" :href="a.url" target="_blank" rel="noopener" class="att">
-                <img v-if="a.kind === 'image'" :src="a.url" class="att-media" alt="" />
+              <a v-for="a in report.attachments" :key="a.id" :href="a.url" target="_blank" rel="noopener" class="att"
+                @click="a.kind === 'image' && ($event.preventDefault(), preview = a)">
+                <img v-if="a.kind === 'image'" :src="a.url" class="att-media" :alt="a.original_name" />
                 <div v-else class="att-media d-flex align-center justify-center bg-grey-darken-3"><v-icon icon="mdi-play-circle" size="36" color="white" /></div>
-                <v-btn size="x-small" variant="text" prepend-icon="mdi-download" :href="a.url" target="_blank">Download</v-btn>
+                <v-btn size="x-small" variant="text" prepend-icon="mdi-download" :href="a.url" target="_blank" @click.stop>Download</v-btn>
               </a>
             </div>
           </v-card-text>
@@ -290,7 +313,7 @@ onMounted(load)
 
         <!-- Conversation + reply/note -->
         <v-card rounded="xl" elevation="10">
-          <v-card-item><v-card-title class="text-subtitle-1">Conversation</v-card-title></v-card-item>
+          <v-card-item><v-card-title class="text-subtitle-1">{{ fromHmis ? 'Notes' : 'Conversation' }}</v-card-title></v-card-item>
           <v-card-text>
             <div v-for="c in report.comments" :key="c.id" class="d-flex ga-3 mb-4">
               <v-avatar :color="c.is_internal ? 'warning' : 'primary'" variant="tonal" size="36">
@@ -307,14 +330,14 @@ onMounted(load)
             </div>
 
             <v-divider class="mb-3" />
-            <v-textarea v-model="reply" :label="internal ? 'Internal note (not visible to user)' : 'Reply to user'"
+            <v-textarea v-model="reply" :label="fromHmis ? 'Note' : internal ? 'Internal note (not visible to user)' : 'Reply to user'"
               variant="outlined" rows="2" auto-grow hide-details density="comfortable" class="mb-2" />
             <div class="d-flex align-center">
-              <v-switch v-model="internal" color="warning" label="Internal note" hide-details density="compact" />
+              <v-switch v-if="!fromHmis" v-model="internal" color="warning" label="Internal note" hide-details density="compact" />
               <v-spacer />
-              <v-btn :color="internal ? 'warning' : 'primary'" :loading="sending" :disabled="!reply.trim()"
-                :prepend-icon="internal ? 'mdi-lock' : 'mdi-send'" @click="send">
-                {{ internal ? 'Add note' : 'Send reply' }}
+              <v-btn :color="fromHmis || internal ? 'warning' : 'primary'" :loading="sending" :disabled="!reply.trim()"
+                :prepend-icon="fromHmis || internal ? 'mdi-lock' : 'mdi-send'" @click="send">
+                {{ fromHmis || internal ? 'Add note' : 'Send reply' }}
               </v-btn>
             </div>
           </v-card-text>
@@ -441,6 +464,19 @@ onMounted(load)
       </v-card-actions>
     </v-card>
   </v-dialog>
+
+  <!-- Image preview -->
+  <v-dialog :model-value="!!preview" max-width="1100" @update:model-value="preview = null">
+    <v-card v-if="preview" rounded="lg">
+      <v-card-title class="d-flex align-center text-subtitle-1">
+        <span class="text-truncate">{{ preview.original_name }}</span>
+        <v-spacer />
+        <v-btn icon="mdi-open-in-new" variant="text" size="small" :href="preview.url" target="_blank" />
+        <v-btn icon="mdi-close" variant="text" size="small" @click="preview = null" />
+      </v-card-title>
+      <img :src="preview.url" :alt="preview.original_name" class="preview-image" />
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>
@@ -448,5 +484,7 @@ onMounted(load)
 .ga-3 { gap: 12px; }
 .font-mono { font-family: monospace; }
 .att { text-decoration: none; color: inherit; text-align: center; }
+.raised-by { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px 24px; padding: 12px 16px; border-radius: 12px; background: rgba(var(--v-theme-on-surface), 0.04); }
+.preview-image { display: block; max-width: 100%; max-height: 80vh; margin: 0 auto; object-fit: contain; }
 .att-media { width: 140px; height: 100px; object-fit: cover; border-radius: 8px; display: block; }
 </style>
