@@ -188,6 +188,7 @@ function clearFilters() {
           <span v-else class="textSecondary">—</span>
         </template>
         <template #item.ticket_id="{ item }"><span class="font-mono text-caption">{{ item.reference || item.ticket_id.slice(0, 8) }}</span></template>
+        <template #item.reporter="{ item }">{{ item.source === 'client' ? item.reporter_name : item.reporter }}</template>
         <template #item.severity="{ item }">
           <span v-if="item.severity" class="text-capitalize">{{ item.severity }}</span>
           <span v-else class="textSecondary">—</span>

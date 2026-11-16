@@ -95,6 +95,7 @@ export interface GroupedReport {
   organization_id?: number | null
   facility_id?: number | null
   reporter_id?: number | null
+  reporter_name?: string | null
   organization?: string | null
   facility?: string | null
   description: string
@@ -121,6 +122,7 @@ export interface ReportSummary {
   organization_id?: number | null
   facility_id?: number | null
   reporter_id?: number | null
+  reporter_name?: string | null
   organization?: string | null
   facility?: string | null
   assigned_to: number | null
