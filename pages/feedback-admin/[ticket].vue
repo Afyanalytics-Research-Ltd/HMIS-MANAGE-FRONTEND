@@ -46,7 +46,7 @@ const internal = ref(false)
 
 // Raised inside the HMIS by hospital staff: there is no account here to reply
 // to, so what is written on the ticket is always a note for the team.
-const fromHmis = computed(() => report.value?.source === 'hmis')
+const fromHmis = computed(() => !!report.value?.organization)
 const preview = ref<{ url: string; original_name: string } | null>(null)
 const sending = ref(false)
 
@@ -230,7 +230,6 @@ onMounted(load)
               <div>
                 <div class="text-caption textSecondary">Reported by</div>
                 <div class="text-body-2 font-weight-medium">{{ report.reporter || '—' }}</div>
-                <div v-if="report.reporter_email" class="text-caption textSecondary">{{ report.reporter_email }}</div>
               </div>
             </div>
             <v-alert

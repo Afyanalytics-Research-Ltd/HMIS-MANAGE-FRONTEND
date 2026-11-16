@@ -18,7 +18,7 @@ const deleting = ref(false)
 
 const filters = reactive({
   search: '', status: null as string | null, type: null as string | null,
-  module: null as string | null, severity: null as string | null, source: null as string | null,
+  module: null as string | null, severity: null as string | null,
   date_from: '', date_to: '',
 })
 
@@ -38,10 +38,6 @@ const statusItems = [
 const typeItems = [
   { title: 'All types', value: null as any },
   { title: 'Bug', value: 'bug' }, { title: 'Feature', value: 'feature' }, { title: 'Observation', value: 'observation' },
-]
-const sourceItems = [
-  { title: 'All sources', value: null as any },
-  { title: 'HMIS', value: 'hmis' }, { title: 'Manage', value: 'manage' },
 ]
 const moduleItems = [{ title: 'All modules', value: null as any }, ...MODULES.map((m) => ({ title: m, value: m }))]
 const severityItems = [{ title: 'All severities', value: null as any }, ...SEVERITIES.map((s) => ({ title: s, value: s }))]
@@ -100,7 +96,7 @@ function applyFilters() {
 }
 
 function clearFilters() {
-  Object.assign(filters, { search: '', status: null, type: null, module: null, severity: null, source: null, date_from: '', date_to: '' })
+  Object.assign(filters, { search: '', status: null, type: null, module: null, severity: null, date_from: '', date_to: '' })
   applyFilters()
 }
 
@@ -138,13 +134,10 @@ function clearFilters() {
           <v-col cols="6" md="2">
             <v-select v-model="filters.severity" :items="severityItems" label="Severity" variant="outlined" density="comfortable" hide-details class="text-capitalize" />
           </v-col>
-          <v-col cols="6" md="2">
-            <v-select v-model="filters.source" :items="sourceItems" label="Source" variant="outlined" density="comfortable" hide-details />
-          </v-col>
-          <v-col cols="6" md="2">
+          <v-col cols="6" md="3">
             <v-text-field v-model="filters.date_from" type="date" label="From" variant="outlined" density="comfortable" hide-details />
           </v-col>
-          <v-col cols="6" md="2">
+          <v-col cols="6" md="3">
             <v-text-field v-model="filters.date_to" type="date" label="To" variant="outlined" density="comfortable" hide-details />
           </v-col>
           <v-col cols="12" md="6" class="d-flex align-center ga-2">
