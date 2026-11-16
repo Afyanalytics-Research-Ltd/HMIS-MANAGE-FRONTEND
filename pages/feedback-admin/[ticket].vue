@@ -216,7 +216,7 @@ onMounted(load)
             </div>
             <h2 class="text-h5 font-weight-semibold mb-1">{{ report.title }}</h2>
             <p class="text-caption textSecondary mb-4">
-              {{ report.module }} · by {{ report.reporter }} · {{ fmt(report.created_at) }}
+              {{ report.module }} · by {{ fromHmis ? report.reporter_name : report.reporter }} · {{ fmt(report.created_at) }}
             </p>
             <div v-if="fromHmis" class="raised-by mb-4">
               <div>
@@ -229,7 +229,7 @@ onMounted(load)
               </div>
               <div>
                 <div class="text-caption textSecondary">Reported by</div>
-                <div class="text-body-2 font-weight-medium">{{ report.reporter || '—' }}</div>
+                <div class="text-body-2 font-weight-medium">{{ report.reporter_name || '—' }}</div>
               </div>
             </div>
             <v-alert
