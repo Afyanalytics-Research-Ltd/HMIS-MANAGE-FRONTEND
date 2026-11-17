@@ -44,8 +44,8 @@ const savingStatus = ref(false)
 const reply = ref('')
 const internal = ref(false)
 
-// Raised inside the HMIS by hospital staff: there is no account here to reply
-// to, so what is written on the ticket is always a note for the team.
+// Raised inside the HMIS by hospital staff: a reply shows on their feedback
+// list there; an internal note stays here.
 const fromHmis = computed(() => report.value?.source === 'client')
 const preview = ref<{ url: string; original_name: string } | null>(null)
 const sending = ref(false)
@@ -178,11 +178,11 @@ async function send() {
   if (!reply.value.trim() || sending.value) return
   sending.value = true
   try {
-    const asNote = fromHmis.value || internal.value
+    const asNote = internal.value
     const c = await api.adminComment(ticket.value, reply.value.trim(), asNote)
     report.value?.comments.push(c)
     reply.value = ''
-    $showToast(asNote ? 'Note added.' : 'Reply sent to user.')
+    $showToast(asNote ? 'Internal note added.' : 'Reply sent to user.')
   } catch (e: any) {
     $showToast(e?.response?.data?.message || 'Failed to send.')
   } finally {
@@ -303,6 +303,10 @@ onMounted(load)
               <a v-for="a in report.attachments" :key="a.id" :href="a.url" target="_blank" rel="noopener" class="att"
                 @click="a.kind === 'image' && ($event.preventDefault(), preview = a)">
                 <img v-if="a.kind === 'image'" :src="a.url" class="att-media" :alt="a.original_name" />
+                <div v-else-if="a.kind === 'file'" class="att-media att-file d-flex flex-column align-center justify-center">
+                  <v-icon :icon="/pdf/i.test(a.mime_type || a.original_name) ? 'mdi-file-pdf-box' : 'mdi-file-word-box'" size="40" />
+                  <span class="text-caption text-truncate px-2" style="max-width: 100%">{{ a.original_name }}</span>
+                </div>
                 <div v-else class="att-media d-flex align-center justify-center bg-grey-darken-3"><v-icon icon="mdi-play-circle" size="36" color="white" /></div>
                 <v-btn size="x-small" variant="text" prepend-icon="mdi-download" :href="a.url" target="_blank" @click.stop>Download</v-btn>
               </a>
@@ -312,7 +316,7 @@ onMounted(load)
 
         <!-- Conversation + reply/note -->
         <v-card rounded="xl" elevation="10">
-          <v-card-item><v-card-title class="text-subtitle-1">{{ fromHmis ? 'Notes' : 'Conversation' }}</v-card-title></v-card-item>
+          <v-card-item><v-card-title class="text-subtitle-1">Conversation</v-card-title></v-card-item>
           <v-card-text>
             <div v-for="c in report.comments" :key="c.id" class="d-flex ga-3 mb-4">
               <v-avatar :color="c.is_internal ? 'warning' : 'primary'" variant="tonal" size="36">
@@ -329,14 +333,14 @@ onMounted(load)
             </div>
 
             <v-divider class="mb-3" />
-            <v-textarea v-model="reply" :label="fromHmis ? 'Note' : internal ? 'Internal note (not visible to user)' : 'Reply to user'"
+            <v-textarea v-model="reply" :label="internal ? 'Internal note (not visible to user)' : fromHmis ? 'Reply to client (shown on their feedback list)' : 'Reply to user'"
               variant="outlined" rows="2" auto-grow hide-details density="comfortable" class="mb-2" />
             <div class="d-flex align-center">
-              <v-switch v-if="!fromHmis" v-model="internal" color="warning" label="Internal note" hide-details density="compact" />
+              <v-switch v-model="internal" color="warning" label="Internal note" hide-details density="compact" />
               <v-spacer />
-              <v-btn :color="fromHmis || internal ? 'warning' : 'primary'" :loading="sending" :disabled="!reply.trim()"
-                :prepend-icon="fromHmis || internal ? 'mdi-lock' : 'mdi-send'" @click="send">
-                {{ fromHmis || internal ? 'Add note' : 'Send reply' }}
+              <v-btn :color="internal ? 'warning' : 'primary'" :loading="sending" :disabled="!reply.trim()"
+                :prepend-icon="internal ? 'mdi-lock' : 'mdi-send'" @click="send">
+                {{ internal ? 'Add note' : 'Send reply' }}
               </v-btn>
             </div>
           </v-card-text>
@@ -486,4 +490,5 @@ onMounted(load)
 .raised-by { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px 24px; padding: 12px 16px; border-radius: 12px; background: rgba(var(--v-theme-on-surface), 0.04); }
 .preview-image { display: block; max-width: 100%; max-height: 80vh; margin: 0 auto; object-fit: contain; }
 .att-media { width: 140px; height: 100px; object-fit: cover; border-radius: 8px; display: block; }
+.att-file { border: 1px solid rgba(var(--v-border-color), 0.2); background: rgba(var(--v-theme-on-surface), 0.04); }
 </style>
