@@ -3,7 +3,7 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useReportsApi } from '@/composables/useReportsApi'
 import {
-  MODULES, SEVERITIES, STATUS_LABELS, STATUS_COLORS,
+  MODULES, SEVERITIES, STATUS_LABELS, STATUS_COLORS, TYPES, typeOf,
   type ReportSummary, type ReportStatus,
 } from '@/types/report'
 
@@ -37,7 +37,7 @@ const statusItems = [
 ]
 const typeItems = [
   { title: 'All types', value: null as any },
-  { title: 'Bug', value: 'bug' }, { title: 'Feature', value: 'feature' }, { title: 'Observation', value: 'observation' },
+  ...Object.entries(TYPES).map(([value, type]) => ({ title: type.label, value })),
 ]
 const sourceItems = [
   { title: 'All tickets', value: null as any },
@@ -168,9 +168,9 @@ function clearFilters() {
         @update:options="load"
         @click:row="(_e: any, { item }: any) => router.push(`/feedback-admin/${item.ticket_id}?from=${encodeURIComponent('/feedback-admin')}`)">
         <template #item.type="{ item }">
-          <v-chip :color="item.type === 'bug' ? 'error' : item.type === 'observation' ? 'teal' : 'primary'" size="small" variant="tonal" label>
-            <v-icon start :icon="item.type === 'bug' ? 'mdi-bug' : item.type === 'observation' ? 'mdi-eye' : 'mdi-lightbulb-on'" size="14" />
-            {{ item.type === 'bug' ? 'Bug' : item.type === 'observation' ? 'Observation' : 'Feature' }}
+          <v-chip :color="typeOf(item.type).color" size="small" variant="tonal" label>
+            <v-icon start :icon="typeOf(item.type).icon" size="14" />
+            {{ typeOf(item.type).label }}
           </v-chip>
         </template>
         <template #item.title="{ item }">

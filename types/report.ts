@@ -1,4 +1,21 @@
-export type ReportType = 'bug' | 'feature' | 'observation'
+export type ReportType = 'bug' | 'feature' | 'technical_support' | 'billing' | 'general_inquiry' | 'observation'
+
+/**
+ * Every ticket type, as it is shown. The first five are the categories a
+ * hospital picks on the HMIS feedback form; an observation is raised here only.
+ */
+export const TYPES: Record<ReportType, { label: string; color: string; icon: string }> = {
+  bug: { label: 'Bug', color: 'error', icon: 'mdi-bug' },
+  feature: { label: 'Feature', color: 'primary', icon: 'mdi-lightbulb-on' },
+  technical_support: { label: 'Technical Support', color: 'info', icon: 'mdi-lifebuoy' },
+  billing: { label: 'Billing', color: 'warning', icon: 'mdi-receipt-text-outline' },
+  general_inquiry: { label: 'General Inquiry', color: 'secondary', icon: 'mdi-help-circle-outline' },
+  observation: { label: 'Observation', color: 'teal', icon: 'mdi-eye' },
+}
+
+/** A type's label, colour and icon; one this build does not know yet is shown by its own name. */
+export const typeOf = (type: string) =>
+  TYPES[type as ReportType] ?? { label: type.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()), color: 'grey', icon: 'mdi-ticket-outline' }
 export type Severity = 'low' | 'medium' | 'high' | 'critical'
 export type ReportStatus =
   | 'new' | 'under_review' | 'assigned' | 'in_progress' | 'resolved' | 'delivered' | 'closed'
