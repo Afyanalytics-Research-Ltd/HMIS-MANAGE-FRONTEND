@@ -1,15 +1,15 @@
 export type ReportType = 'bug' | 'feature' | 'technical_support' | 'billing' | 'general_inquiry' | 'observation'
 
 /**
- * Every ticket type, as it is shown. The first five are the categories a
- * hospital picks on the HMIS feedback form; an observation is raised here only.
+ * The ticket types, in the order and by the names of the category list on the
+ * HMIS feedback form, then Observation, which is raised here only.
  */
 export const TYPES: Record<ReportType, { label: string; color: string; icon: string }> = {
-  bug: { label: 'Bug', color: 'error', icon: 'mdi-bug' },
-  feature: { label: 'Feature', color: 'primary', icon: 'mdi-lightbulb-on' },
   technical_support: { label: 'Technical Support', color: 'info', icon: 'mdi-lifebuoy' },
   billing: { label: 'Billing', color: 'warning', icon: 'mdi-receipt-text-outline' },
   general_inquiry: { label: 'General Inquiry', color: 'secondary', icon: 'mdi-help-circle-outline' },
+  feature: { label: 'Feature Request', color: 'primary', icon: 'mdi-lightbulb-on' },
+  bug: { label: 'Bug Report', color: 'error', icon: 'mdi-bug' },
   observation: { label: 'Observation', color: 'teal', icon: 'mdi-eye' },
 }
 
