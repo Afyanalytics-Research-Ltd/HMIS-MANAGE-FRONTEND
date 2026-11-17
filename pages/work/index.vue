@@ -3,7 +3,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useReportsApi } from '@/composables/useReportsApi'
 import { useAuthStore } from '@/stores/auth'
-import { SEVERITIES, STATUS_LABELS, STATUS_FLOW, type ReportSummary, type ReportStatus, type Severity } from '~/types/report'
+import { SEVERITIES, STATUS_LABELS, STATUS_FLOW, TYPES, typeOf, type ReportSummary, type ReportStatus, type Severity } from '~/types/report'
 
 const api = useReportsApi()
 const router = useRouter()
@@ -156,7 +156,7 @@ onMounted(load)
           />
           <v-select
             v-model="filters.type"
-            :items="[{ title: 'Bug', value: 'bug' }, { title: 'Feature', value: 'feature' }]"
+            :items="Object.entries(TYPES).map(([value, type]) => ({ title: type.label, value }))"
             label="Type" clearable
             variant="outlined" density="compact" hide-details
             style="max-width: 180px"
@@ -227,8 +227,8 @@ onMounted(load)
           <span class="font-weight-medium">{{ item.reference }}</span>
         </template>
         <template #item.type="{ item }">
-          <v-chip size="small" :color="item.type === 'bug' ? 'error' : 'info'" variant="tonal" label>
-            {{ item.type === 'bug' ? 'Bug' : 'Feature' }}
+          <v-chip size="small" :color="typeOf(item.type).color" variant="tonal" label>
+            {{ typeOf(item.type).label }}
           </v-chip>
         </template>
         <template #item.severity="{ item }">
