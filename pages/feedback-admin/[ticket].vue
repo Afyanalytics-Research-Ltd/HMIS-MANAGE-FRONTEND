@@ -303,6 +303,10 @@ onMounted(load)
               <a v-for="a in report.attachments" :key="a.id" :href="a.url" target="_blank" rel="noopener" class="att"
                 @click="a.kind === 'image' && ($event.preventDefault(), preview = a)">
                 <img v-if="a.kind === 'image'" :src="a.url" class="att-media" :alt="a.original_name" />
+                <div v-else-if="a.kind === 'file'" class="att-media att-file d-flex flex-column align-center justify-center">
+                  <v-icon :icon="/pdf/i.test(a.mime_type || a.original_name) ? 'mdi-file-pdf-box' : 'mdi-file-word-box'" size="40" />
+                  <span class="text-caption text-truncate px-2" style="max-width: 100%">{{ a.original_name }}</span>
+                </div>
                 <div v-else class="att-media d-flex align-center justify-center bg-grey-darken-3"><v-icon icon="mdi-play-circle" size="36" color="white" /></div>
                 <v-btn size="x-small" variant="text" prepend-icon="mdi-download" :href="a.url" target="_blank" @click.stop>Download</v-btn>
               </a>
@@ -486,4 +490,5 @@ onMounted(load)
 .raised-by { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px 24px; padding: 12px 16px; border-radius: 12px; background: rgba(var(--v-theme-on-surface), 0.04); }
 .preview-image { display: block; max-width: 100%; max-height: 80vh; margin: 0 auto; object-fit: contain; }
 .att-media { width: 140px; height: 100px; object-fit: cover; border-radius: 8px; display: block; }
+.att-file { border: 1px solid rgba(var(--v-border-color), 0.2); background: rgba(var(--v-theme-on-surface), 0.04); }
 </style>
