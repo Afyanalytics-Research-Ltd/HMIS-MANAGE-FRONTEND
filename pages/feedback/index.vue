@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useReportsApi } from '@/composables/useReportsApi'
-import { STATUS_LABELS, STATUS_COLORS, typeOf, type ReportSummary, type ReportStatus } from '@/types/report'
+import { STATUS_LABELS, STATUS_COLORS, type ReportSummary, type ReportStatus } from '@/types/report'
 
 const router = useRouter()
 const api = useReportsApi()
@@ -59,9 +59,11 @@ onMounted(load)
           <span class="font-weight-medium">{{ item.reference || '—' }}</span>
         </template>
         <template #item.type="{ item }">
-          <v-chip :color="typeOf(item.type).color" size="small" variant="tonal" label>
-            <v-icon start :icon="typeOf(item.type).icon" size="14" />
-            {{ typeOf(item.type).label }}
+          <v-chip
+            :color="item.type === 'bug' ? 'error' : item.type === 'observation' ? 'teal' : 'primary'"
+            size="small" variant="tonal" label>
+            <v-icon start :icon="item.type === 'bug' ? 'mdi-bug' : item.type === 'observation' ? 'mdi-eye' : 'mdi-lightbulb-on'" size="14" />
+            {{ item.type === 'bug' ? 'Bug' : item.type === 'observation' ? 'Observation' : 'Feature' }}
           </v-chip>
         </template>
         <template #item.title="{ item }"><span class="font-weight-medium">{{ item.title }}</span></template>

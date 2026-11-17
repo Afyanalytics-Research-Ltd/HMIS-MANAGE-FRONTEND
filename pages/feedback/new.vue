@@ -2,7 +2,7 @@
 import { reactive, ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useReportsApi } from '@/composables/useReportsApi'
-import { MODULES, SEVERITIES, TYPES, type ReportType, type Severity } from '@/types/report'
+import { MODULES, SEVERITIES, type ReportType, type Severity } from '@/types/report'
 import { useNuxtApp } from '#app'
 
 const router = useRouter()
@@ -164,11 +164,10 @@ async function submit() {
       <v-card rounded="xl" elevation="10">
         <v-card-text class="pa-6">
           <!-- Report type (segmented) -->
-          <v-chip-group v-model="form.type" mandatory column selected-class="text-primary" class="mb-4">
-            <v-chip v-for="(type, value) in TYPES" :key="value" :value="value" variant="outlined" filter>
-              <v-icon start :icon="type.icon" size="16" />{{ type.label }}
-            </v-chip>
-          </v-chip-group>
+          <v-btn-toggle v-model="form.type" mandatory divided rounded="lg" color="primary" class="mb-6 w-100">
+            <v-btn value="bug" class="flex-grow-1"><v-icon start icon="mdi-bug" /> Report a Bug</v-btn>
+            <v-btn value="feature" class="flex-grow-1"><v-icon start icon="mdi-lightbulb-on" /> Suggest a Feature</v-btn>
+          </v-btn-toggle>
 
           <!-- Linked test case (auto — shown, never editable) -->
           <v-alert
@@ -190,10 +189,10 @@ async function submit() {
           <v-textarea
             v-model="form.description" variant="outlined" rows="6" auto-grow class="mb-2"
             :error-messages="errors.description"
-            :label="isBug ? 'What happened?' : form.type === 'feature' ? 'Describe your idea' : 'Details'"
+            :label="isBug ? 'What happened?' : 'Describe your idea'"
             :placeholder="isBug
               ? 'What happened? What did you expect? How can we reproduce it?'
-              : form.type === 'feature' ? 'What should it do, and why would it be useful?' : 'What would you like us to know?'"
+              : 'What should it do, and why would it be useful?'"
           />
 
           <div class="d-flex flex-wrap ga-4 mb-2">
