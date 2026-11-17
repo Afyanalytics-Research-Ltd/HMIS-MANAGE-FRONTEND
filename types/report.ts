@@ -1,4 +1,27 @@
-export type ReportType = 'bug' | 'feature' | 'observation'
+export type ReportType = 'bug' | 'feature' | 'technical_support' | 'billing' | 'general_inquiry' | 'observation'
+
+/**
+ * The ticket types, in the order and by the names of the category list on the
+ * HMIS feedback form, then Observation, which is raised here only.
+ */
+export const TYPES: Record<ReportType, { label: string; color: string; icon: string }> = {
+  technical_support: { label: 'Technical Support', color: 'info', icon: 'mdi-lifebuoy' },
+  billing: { label: 'Billing', color: 'warning', icon: 'mdi-receipt-text-outline' },
+  general_inquiry: { label: 'General Inquiry', color: 'secondary', icon: 'mdi-help-circle-outline' },
+  feature: { label: 'Feature Request', color: 'primary', icon: 'mdi-lightbulb-on' },
+  bug: { label: 'Bug Report', color: 'error', icon: 'mdi-bug' },
+  observation: { label: 'Observation', color: 'teal', icon: 'mdi-eye' },
+}
+
+/**
+ * The types someone here can log a ticket under. A general inquiry is a
+ * hospital's question, so it only ever arrives from the HMIS.
+ */
+export const LOGGABLE_TYPES = (Object.keys(TYPES) as ReportType[]).filter((type) => type !== 'general_inquiry')
+
+/** A type's label, colour and icon; one this build does not know yet is shown by its own name. */
+export const typeOf = (type: string) =>
+  TYPES[type as ReportType] ?? { label: type.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()), color: 'grey', icon: 'mdi-ticket-outline' }
 export type Severity = 'low' | 'medium' | 'high' | 'critical'
 export type ReportStatus =
   | 'new' | 'under_review' | 'assigned' | 'in_progress' | 'resolved' | 'delivered' | 'closed'
