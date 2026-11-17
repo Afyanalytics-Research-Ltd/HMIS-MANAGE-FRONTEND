@@ -13,6 +13,12 @@ export const TYPES: Record<ReportType, { label: string; color: string; icon: str
   observation: { label: 'Observation', color: 'teal', icon: 'mdi-eye' },
 }
 
+/**
+ * The types someone here can log a ticket under. A general inquiry is a
+ * hospital's question, so it only ever arrives from the HMIS.
+ */
+export const LOGGABLE_TYPES = (Object.keys(TYPES) as ReportType[]).filter((type) => type !== 'general_inquiry')
+
 /** A type's label, colour and icon; one this build does not know yet is shown by its own name. */
 export const typeOf = (type: string) =>
   TYPES[type as ReportType] ?? { label: type.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()), color: 'grey', icon: 'mdi-ticket-outline' }
