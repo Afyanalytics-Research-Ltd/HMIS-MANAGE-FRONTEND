@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { useReportsApi } from '@/composables/useReportsApi'
 import { useNuxtApp } from '#app'
 import {
-  STATUS_LABELS, STATUS_COLORS, SEVERITY_COLORS,
+  STATUS_LABELS, STATUS_COLORS, SEVERITY_COLORS, typeOf,
   type ReportDetail, type ReportStatus, type Severity,
 } from '@/types/report'
 
@@ -65,9 +65,9 @@ onMounted(load)
       <v-card rounded="xl" elevation="10" class="mb-4">
         <v-card-text class="pa-6">
           <div class="d-flex flex-wrap align-center ga-2 mb-2">
-            <v-chip :color="report.type === 'bug' ? 'error' : 'primary'" size="small" variant="tonal" label>
-              <v-icon start :icon="report.type === 'bug' ? 'mdi-bug' : 'mdi-lightbulb-on'" size="14" />
-              {{ report.type === 'bug' ? 'Bug' : 'Feature' }}
+            <v-chip :color="typeOf(report.type).color" size="small" variant="tonal" label>
+              <v-icon start :icon="typeOf(report.type).icon" size="14" />
+              {{ typeOf(report.type).label }}
             </v-chip>
             <v-chip v-if="report.severity" :color="SEVERITY_COLORS[report.severity as Severity]" size="small" variant="tonal" label class="text-capitalize">
               {{ report.severity }}
