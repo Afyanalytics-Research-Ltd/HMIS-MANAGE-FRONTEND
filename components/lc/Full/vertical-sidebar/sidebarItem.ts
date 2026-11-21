@@ -89,6 +89,14 @@ const sidebarItem: menu[] = [
                 roles: ['system_admin'],
             },
             {
+                title: 'System Maintenance',
+                icon: 'settings-line-duotone',
+                to: '/maintenance',
+                // Takes the whole HMIS offline — system admin only, matching the
+                // platform:system_admin gate on every write route.
+                roles: ['system_admin'],
+            },
+            {
                 title: 'Tester Activity',
                 icon: 'chart-2-line-duotone',
                 to: '/tester-activity',
