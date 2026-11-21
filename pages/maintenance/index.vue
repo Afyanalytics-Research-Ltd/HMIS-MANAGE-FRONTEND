@@ -125,8 +125,12 @@ const countdown = computed(() => {
 
 // ── Loading ───────────────────────────────────────────────────────────────
 
-async function load() {
-  loading.value = true
+/**
+ * @param background true for the 30s refresh, which must stay quiet: it has no
+ *   user behind it, so a toast per failure becomes a toast storm.
+ */
+async function load(background = false) {
+  if (!background) loading.value = true
   try {
     const state = await api.state()
     current.value = state.current
@@ -134,9 +138,18 @@ async function load() {
     serverOffsetMs.value = Date.parse(state.serverNow) - Date.now()
     now.value = Date.now() + serverOffsetMs.value
   } catch (e: any) {
-    $showToast(e?.response?.data?.message || 'Could not load the maintenance state.')
+    const status = e?.response?.status
+    // The session is gone (or this account lost the role). Re-polling a dead
+    // token just fills the console with 401s and cannot recover on its own —
+    // the app's own auth handling deals with the session.
+    if (background && (status === 401 || status === 403)) {
+      clearInterval(pollTimer)
+      pollTimer = undefined
+      return
+    }
+    if (!background) $showToast(e?.response?.data?.message || 'Could not load the maintenance state.')
   } finally {
-    loading.value = false
+    if (!background) loading.value = false
   }
 }
 
@@ -144,7 +157,7 @@ onMounted(() => {
   load()
   clockTimer = setInterval(() => { now.value = Date.now() + serverOffsetMs.value }, 1000)
   // Another admin may have changed things; keep this screen honest.
-  pollTimer = setInterval(load, 30_000)
+  pollTimer = setInterval(() => load(true), 30_000)
 })
 onBeforeUnmount(() => { clearInterval(clockTimer); clearInterval(pollTimer) })
 
