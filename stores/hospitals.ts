@@ -62,12 +62,17 @@ export const useHospitalsStore = defineStore('hospitals', () => {
   const terminalItems = ref<TerminalHospital[]>([])
   const loadingTerminal = ref(false)
   const terminalError = ref('')
+  // Stacks whose core-service didn't answer — the rest are still listed.
+  const terminalUnavailable = ref<string[]>([])
 
   async function fetchTerminal() {
     loadingTerminal.value = true
     terminalError.value = ''
+    terminalUnavailable.value = []
     try {
-      terminalItems.value = (await api.listTerminal()).data
+      const res = await api.listTerminal()
+      terminalItems.value = res.data
+      terminalUnavailable.value = (res.meta?.unavailable ?? []).map((u) => u.v3_target_label)
     } catch (err: any) {
       terminalError.value = err?.response?.data?.message || 'Failed to load terminal hospitals.'
     } finally {
@@ -79,12 +84,12 @@ export const useHospitalsStore = defineStore('hospitals', () => {
   // search keystroke) can't overwrite the results of a newer request.
   let listRequestId = 0
 
-  async function fetchList(page = 1, perPage = 25, search = '') {
+  async function fetchList(page = 1, perPage = 25, search = '', target = '') {
     const requestId = ++listRequestId
     loading.value = true
     error.value = ''
     try {
-      const res = await api.list({ page, per_page: perPage, search: search.trim() || undefined })
+      const res = await api.list({ page, per_page: perPage, search: search.trim() || undefined, target: target || undefined })
       if (requestId !== listRequestId) return
       items.value = res.data
       meta.value = res.meta
@@ -478,7 +483,7 @@ export const useHospitalsStore = defineStore('hospitals', () => {
     pendingCoreAccountLink, linkingAdmin,
     lastCreateResult, lastRetryResult, seeding, lastSeedResult,
     coreOrganizations, loadingCoreOrganizations, v3Targets,
-    terminalItems, loadingTerminal, terminalError, fetchTerminal,
+    terminalItems, loadingTerminal, terminalError, terminalUnavailable, fetchTerminal,
     fetchList, fetchOne, create, update, retryProvisioning, seedReferenceData, provisionAdmin, linkAdmin, cancelCoreAccountLink, updateAdmin, addAdmin, addFacility, provisionFacility, linkCore, removeAdmin, setActive,
     fetchCoreOrganizations, fetchV3Targets,
   }
