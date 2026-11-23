@@ -19,6 +19,10 @@ import type {
   RetryProvisioningResponse,
   SeedReferenceDataResponse,
   SeedingStatusResponse,
+  StackMoveInput,
+  StackMovePreview,
+  StackMoveRecord,
+  StackMoveResult,
   TerminalHospitalListResponse,
   UpdateAdminPayload,
   UpdateAdminResponse,
@@ -154,5 +158,21 @@ export function useHospitalsApi() {
     return data.data
   }
 
-  return { list, listTerminal, show, create, update, retryProvisioning, seedReferenceData, getSeedingStatus, provisionAdmin, linkAdmin, updateAdmin, addAdmin, addFacility, provisionFacility, linkCore, removeAdmin, searchFacility, getCoreOrganizations, getV3Targets }
+  // Move a hospital to another v3 stack (system admin only).
+  async function previewMoveStack(orgId: string, target: string): Promise<StackMovePreview> {
+    const { data } = await $axios.get(`/v1/platform/hospitals/${orgId}/move-stack`, { params: { target } })
+    return data.data
+  }
+
+  async function moveStack(orgId: string, input: StackMoveInput): Promise<StackMoveResult> {
+    const { data } = await $axios.post(`/v1/platform/hospitals/${orgId}/move-stack`, input)
+    return data
+  }
+
+  async function getStackMoves(orgId: string): Promise<StackMoveRecord[]> {
+    const { data } = await $axios.get(`/v1/platform/hospitals/${orgId}/stack-moves`)
+    return data.data
+  }
+
+  return { list, listTerminal, show, create, update, retryProvisioning, seedReferenceData, getSeedingStatus, provisionAdmin, linkAdmin, updateAdmin, addAdmin, addFacility, provisionFacility, linkCore, removeAdmin, searchFacility, getCoreOrganizations, getV3Targets, previewMoveStack, moveStack, getStackMoves }
 }

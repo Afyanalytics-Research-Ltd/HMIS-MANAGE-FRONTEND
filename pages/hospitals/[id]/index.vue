@@ -9,6 +9,7 @@ import { STATUS_COLOR, TIER_COLOR, BILLING_COLOR, type HospitalAdminUser } from 
 import type { Deployment } from '@/types/deployment'
 import ApiCredentialsCard from '@/components/hospitals/ApiCredentialsCard.vue'
 import AddFacilityDialog from '@/components/hospitals/AddFacilityDialog.vue'
+import MoveStackDialog from '@/components/hospitals/MoveStackDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -110,6 +111,9 @@ async function saveAdminEdit() {
     )
   }
 }
+
+// "Move to another stack" — system admins only (the API enforces it too).
+const moveStackDialog = ref(false)
 
 const addFacilityDialog = ref(false)
 async function retryFacility(facilityId: string) {
@@ -305,7 +309,11 @@ watch(
         <v-card-text class="d-flex flex-wrap align-center ga-6">
           <div>
             <p class="text-caption textSecondary mb-0">System</p>
-            <p class="text-body-1 font-weight-medium mb-0">{{ h.v3_target_label }}</p>
+            <p class="text-body-1 font-weight-medium mb-0">
+              {{ h.v3_target_label }}
+              <v-btn v-if="auth.isSystemAdmin" size="x-small" variant="text" prepend-icon="mdi-swap-horizontal"
+                class="ml-1" @click="moveStackDialog = true">Move…</v-btn>
+            </p>
           </div>
           <div>
             <p class="text-caption textSecondary mb-0">Organization ID</p>
@@ -746,6 +754,13 @@ watch(
 
     <!-- Add facility dialog -->
     <AddFacilityDialog v-model="addFacilityDialog" :org-id="id" />
+
+    <!-- Move to another v3 stack -->
+    <!-- Not v-if on h: the hospital reloads after a move, and the dialog
+         (with its one-time admin passwords) must survive that. -->
+    <MoveStackDialog v-if="auth.isSystemAdmin" v-model="moveStackDialog" :org-id="id"
+      :hospital-name="h?.display_name || h?.name || ''" :current-target="h?.v3_target ?? ''"
+      @moved="store.fetchOne(id)" />
 
     <!-- Add admin dialog -->
     <v-dialog v-model="addAdminDialog" max-width="480">

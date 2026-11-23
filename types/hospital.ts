@@ -417,3 +417,50 @@ export interface SimilarOrganization {
   match: 'likely_same' | 'similar'
   similarity: number
 }
+
+// ── Move a hospital to another v3 stack (HospitalStackMoveController) ────────
+export interface StackMovePreview {
+  from: { key: string; label: string }
+  to: { key: string; label: string }
+  blockers: string[]
+  old_core_org_id: string | null
+  facilities: { id: string; name: string }[]
+  admins: { id: number; name: string; email: string; shared: boolean }[]
+  target_has: { evaluation: boolean; inventory: boolean }
+  not_moved: string[]
+}
+
+export interface StackMoveInput {
+  target: string
+  reason: string
+  confirm_name: string
+  existing_core_org_id?: string | null
+  deactivate_old_admins?: boolean
+  seed?: boolean
+}
+
+export interface StackMoveRecord {
+  id: number
+  from: { key: string; label: string }
+  to: { key: string; label: string }
+  from_core_org_id: string | null
+  to_core_org_id: string | null
+  status: 'completed' | 'failed'
+  error: string | null
+  reason: string
+  moved_by: string | null
+  created_at: string
+}
+
+export interface StackMoveResult {
+  data: { v3_target: string; v3_target_label: string; core_org_id: string }
+  move: StackMoveRecord
+  facilities: { id: string; name: string; core_facility_id: string | null; error: string | null }[]
+  // password is returned this once (and emailed); never stored.
+  admins: {
+    id: number; name: string; email: string; core_user_id?: string; password?: string
+    old_deactivated?: boolean; skipped?: string; error?: string
+  }[]
+  seeding_run_id: number | null
+  not_moved: string[]
+}
