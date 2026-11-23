@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useHospitalsStore } from '@/stores/hospitals'
 import { useAuthStore } from '@/stores/auth'
 import { STATUS_COLOR, TIER_COLOR, BILLING_COLOR } from '@/types/hospital'
 
 const router = useRouter()
+const route = useRoute()
 const store = useHospitalsStore()
 const auth = useAuthStore()
 
@@ -50,10 +51,19 @@ const rowsLength = computed(() => (term.value === search.value ? store.meta?.tot
 // (never registered through hmis-manage). Platform staff only; the whole list
 // comes back in one call, so it is filtered in the browser. Loaded the first
 // time the tab is opened.
-const tab = ref<'registered' | 'terminal'>('registered')
+// The tab is kept in the URL (?tab=terminal) so coming back from a terminal
+// hospital's page lands on the same tab.
+const tab = ref<'registered' | 'terminal'>(route.query.tab === 'terminal' ? 'terminal' : 'registered')
 watch(tab, (t) => {
   if (t === 'terminal' && !store.terminalItems.length && !store.loadingTerminal) store.fetchTerminal()
-})
+  if ((route.query.tab ?? 'registered') !== t) {
+    router.replace({ query: { ...route.query, tab: t === 'terminal' ? 'terminal' : undefined } })
+  }
+}, { immediate: true })
+
+function openTerminal(item: { v3_target: string; id: string | number }) {
+  router.push(`/hospitals/terminal/${encodeURIComponent(item.v3_target)}/${encodeURIComponent(String(item.id))}`)
+}
 
 // System (v3 stack) filter, shared by both tabs. '' = every system. The
 // registered list is filtered server-side; the terminal list in the browser.
@@ -84,6 +94,7 @@ const terminalHeaders = computed(() => [
   ...(multiSystem.value ? [{ title: 'System', key: 'v3_target_label', sortable: true }] : []),
   { title: 'Code', key: 'code', sortable: true },
   { title: 'Status', key: 'status', sortable: true },
+  { title: '', key: 'actions', sortable: false, align: 'end' as const },
 ])
 
 const headers = computed(() => [
@@ -247,6 +258,8 @@ onMounted(() => {
           :headers="terminalHeaders"
           :items="terminalRows"
           :loading="store.loadingTerminal"
+          hover
+          @click:row="(_e: any, { item }: any) => openTerminal(item)"
           :items-per-page="25"
           :items-per-page-options="[10, 25, 50, 100]"
         >
@@ -270,6 +283,9 @@ onMounted(() => {
               {{ item.status }}
             </v-chip>
             <span v-else class="textSecondary">—</span>
+          </template>
+          <template #item.actions="{ item }">
+            <v-btn icon="mdi-chevron-right" variant="text" size="small" @click.stop="openTerminal(item)" />
           </template>
           <template #no-data>
             <div class="pa-8 text-center textSecondary">
