@@ -55,32 +55,50 @@ watch(tab, (t) => {
   if (t === 'terminal' && !store.terminalItems.length && !store.loadingTerminal) store.fetchTerminal()
 })
 
+// System (v3 stack) filter, shared by both tabs. '' = every system. The
+// registered list is filtered server-side; the terminal list in the browser.
+const system = ref('')
+const systemItems = computed(() => [
+  { key: '', label: 'All systems' },
+  ...store.v3Targets.map((t) => ({ key: t.key, label: t.label })),
+])
+// Only worth a column/filter once there is more than one system.
+const multiSystem = computed(() => store.v3Targets.length > 1)
+const isDefaultSystem = (key: string) => store.v3Targets.find((t) => t.key === key)?.default ?? false
+watch(system, () => {
+  page.value = 1
+  load()
+})
+
 const terminalRows = computed(() => {
   const q = term.value.toLowerCase()
-  if (!q) return store.terminalItems
-  return store.terminalItems.filter(
+  const items = system.value ? store.terminalItems.filter((t) => t.v3_target === system.value) : store.terminalItems
+  if (!q) return items
+  return items.filter(
     (t) => [t.name, t.code].some((v) => v?.toLowerCase().includes(q)) || String(t.id).startsWith(q),
   )
 })
 
-const terminalHeaders = [
+const terminalHeaders = computed(() => [
   { title: 'Hospital', key: 'name', sortable: true },
+  ...(multiSystem.value ? [{ title: 'System', key: 'v3_target_label', sortable: true }] : []),
   { title: 'Code', key: 'code', sortable: true },
   { title: 'Status', key: 'status', sortable: true },
-]
+])
 
-const headers = [
+const headers = computed(() => [
   { title: 'Hospital', key: 'name', sortable: false },
+  ...(multiSystem.value ? [{ title: 'System', key: 'v3_target_label', sortable: false }] : []),
   { title: 'Subdomain', key: 'subdomain', sortable: false },
   { title: 'Tier', key: 'subscription_tier', sortable: false },
   { title: 'Billing', key: 'billing_status', sortable: false },
   { title: 'Status', key: 'status', sortable: false },
   { title: 'Users', key: 'max_user_slots', sortable: false, align: 'end' as const },
   { title: '', key: 'actions', sortable: false, align: 'end' as const },
-]
+])
 
 async function load() {
-  await store.fetchList(page.value, perPage.value, search.value)
+  await store.fetchList(page.value, perPage.value, search.value, system.value)
 }
 
 function onTableUpdate(opts: { page: number; itemsPerPage: number }) {
@@ -93,7 +111,10 @@ function openHospital(id: string) {
   router.push(`/hospitals/${id}`)
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  if (isPlatform.value) store.fetchV3Targets()
+})
 </script>
 
 <template>
@@ -119,7 +140,7 @@ onMounted(load)
         </v-tab>
       </v-tabs>
       <v-divider v-if="isPlatform" />
-      <div v-if="isPlatform" class="pa-4 pb-0">
+      <div v-if="isPlatform" class="d-flex flex-wrap ga-3 pa-4 pb-0">
         <v-text-field
           v-model="searchInput"
           prepend-inner-icon="mdi-magnify"
@@ -128,7 +149,19 @@ onMounted(load)
           density="compact"
           hide-details
           clearable
-          style="max-width: 420px"
+          style="max-width: 420px; min-width: 220px"
+        />
+        <v-select
+          v-if="multiSystem"
+          v-model="system"
+          :items="systemItems"
+          item-title="label"
+          item-value="key"
+          prepend-inner-icon="mdi-layers-triple-outline"
+          variant="outlined"
+          density="compact"
+          hide-details
+          style="max-width: 240px; min-width: 180px"
         />
       </div>
       <v-data-table-server
@@ -150,6 +183,12 @@ onMounted(load)
             <div class="font-weight-semibold">{{ item.name }}</div>
             <div class="text-caption textSecondary">{{ item.id }}</div>
           </div>
+        </template>
+
+        <template #item.v3_target_label="{ item }">
+          <v-chip size="small" :color="isDefaultSystem(item.v3_target) ? undefined : 'secondary'" variant="tonal" label>
+            {{ item.v3_target_label }}
+          </v-chip>
         </template>
 
         <template #item.subdomain="{ item }">
@@ -191,9 +230,15 @@ onMounted(load)
 
       <template v-if="isPlatform && tab === 'terminal'">
         <p class="text-caption textSecondary px-4 pt-3 mb-0">
-          Tenants on the core platform that have no hospital in this management platform.
+          Tenants on the core platform of every system that have no hospital in this management platform.
         </p>
         <v-alert v-if="store.terminalError" type="error" variant="tonal" class="ma-4" :text="store.terminalError">
+          <template #append>
+            <v-btn variant="text" size="small" @click="store.fetchTerminal()">Retry</v-btn>
+          </template>
+        </v-alert>
+        <v-alert v-else-if="store.terminalUnavailable.length" type="warning" variant="tonal" density="compact" class="ma-4"
+          :text="`Couldn't reach ${store.terminalUnavailable.join(', ')}, so its tenants aren't listed. Check it with Test on the Systems page.`">
           <template #append>
             <v-btn variant="text" size="small" @click="store.fetchTerminal()">Retry</v-btn>
           </template>
@@ -210,6 +255,11 @@ onMounted(load)
               <div class="font-weight-semibold">{{ item.name }}</div>
               <div class="text-caption textSecondary">Core ID {{ item.id }}</div>
             </div>
+          </template>
+          <template #item.v3_target_label="{ item }">
+            <v-chip size="small" :color="isDefaultSystem(item.v3_target) ? undefined : 'secondary'" variant="tonal" label>
+              {{ item.v3_target_label }}
+            </v-chip>
           </template>
           <template #item.code="{ item }">
             <span v-if="item.code">{{ item.code }}</span>

@@ -160,11 +160,15 @@ export interface TerminalHospital {
   name: string
   code: string | null
   status: string | null
+  // The v3 stack this tenant lives on (core ids are only unique per stack).
+  v3_target: string
+  v3_target_label: string
 }
 
 export interface TerminalHospitalListResponse {
   data: TerminalHospital[]
-  meta: { total: number }
+  // Stacks whose core-service couldn't be reached — their tenants are missing.
+  meta: { total: number; unavailable: { v3_target: string; v3_target_label: string }[] }
 }
 
 export interface PaginationMeta {

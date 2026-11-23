@@ -43,12 +43,13 @@ import type {
 export function useHospitalsApi() {
   const { $axios } = useNuxtApp()
 
-  async function list(params: { page?: number; per_page?: number; search?: string } = {}): Promise<HospitalListResponse> {
+  async function list(params: { page?: number; per_page?: number; search?: string; target?: string } = {}): Promise<HospitalListResponse> {
     const { data } = await $axios.get<HospitalListResponse>('/v1/platform/hospitals', { params })
     return data
   }
 
-  // Core-service tenants not registered here — the whole list in one call.
+  // Core-service tenants not registered here — the whole list in one call,
+  // across every configured stack (each row says which).
   async function listTerminal(): Promise<TerminalHospitalListResponse> {
     const { data } = await $axios.get<TerminalHospitalListResponse>('/v1/platform/hospitals/terminal')
     return data
