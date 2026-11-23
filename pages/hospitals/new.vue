@@ -184,6 +184,18 @@ function clearDraft() {
 
 restoreDraft()
 
+// "Register in HMIS Manage" on a terminal hospital's page lands here with
+// ?target=&core_org_id=&name= — start a fresh wizard already pointed at that
+// existing organization (it wins over any half-finished draft).
+const prefillCoreOrgId = Number(route.query.core_org_id)
+if (Number.isInteger(prefillCoreOrgId) && prefillCoreOrgId > 0) {
+  step.value = 1
+  useExistingOrg.value = true
+  selectedTarget.value = typeof route.query.target === 'string' ? route.query.target : ''
+  selectedCoreOrgId.value = prefillCoreOrgId
+  if (typeof route.query.name === 'string') form.name = route.query.name
+}
+
 // Load the systems, then the existing-organization list for whichever one is
 // selected (a restored draft may already point at a non-default system).
 store.fetchV3Targets().then(() => {

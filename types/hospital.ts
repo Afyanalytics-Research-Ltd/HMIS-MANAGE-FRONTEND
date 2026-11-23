@@ -165,6 +165,43 @@ export interface TerminalHospital {
   v3_target_label: string
 }
 
+// GET /hospitals/terminal/{target}/{coreOrgId} — one terminal hospital as
+// core-service describes it. facilities/users/admins are null when that
+// stack's core-service predates the detail endpoint (details_available false).
+export interface TerminalHospitalDetail {
+  core_org_id: string
+  v3_target: string
+  v3_target_label: string
+  details_available: boolean
+  organization: {
+    id: number | string
+    name: string
+    code?: string | null
+    type?: string | null
+    status?: string | null
+    registration_number?: string | null
+    tax_number?: string | null
+    phone?: string | null
+    email?: string | null
+    website?: string | null
+    address?: string | null
+    city?: string | null
+    state?: string | null
+    country?: string | null
+    postal_code?: string | null
+    created_at?: string | null
+    updated_at?: string | null
+  }
+  facilities: { id: number; name: string; mfl_code: string | null; status: string | null; release_mode?: string | null; created_at?: string | null }[] | null
+  users: { total: number; active: number } | null
+  admins: {
+    id: number; name: string; username: string | null; email: string | null
+    active: boolean; is_owner: boolean; roles: string[]; last_login: string | null
+  }[] | null
+  // Set when a hospital here is linked to this organization after all.
+  registered_hospital: { id: string; name: string } | null
+}
+
 export interface TerminalHospitalListResponse {
   data: TerminalHospital[]
   // Stacks whose core-service couldn't be reached — their tenants are missing.

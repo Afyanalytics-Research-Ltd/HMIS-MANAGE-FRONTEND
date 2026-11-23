@@ -55,6 +55,12 @@ export function useHospitalsApi() {
     return data
   }
 
+  // One terminal hospital, read from that stack's core-service.
+  async function showTerminal(target: string, coreOrgId: string | number): Promise<TerminalHospitalDetail> {
+    const { data } = await $axios.get<{ data: TerminalHospitalDetail }>(`/v1/platform/hospitals/terminal/${encodeURIComponent(target)}/${encodeURIComponent(String(coreOrgId))}`)
+    return data.data
+  }
+
   async function show(id: string): Promise<HospitalDetail> {
     const { data } = await $axios.get<HospitalShowResponse>(`/v1/platform/hospitals/${id}`)
     return data.data
@@ -175,5 +181,5 @@ export function useHospitalsApi() {
     return data.data
   }
 
-  return { list, listTerminal, show, create, update, retryProvisioning, seedReferenceData, getSeedingStatus, provisionAdmin, linkAdmin, updateAdmin, addAdmin, addFacility, provisionFacility, linkCore, removeAdmin, searchFacility, getCoreOrganizations, getV3Targets, previewMoveStack, moveStack, getStackMoves }
+  return { list, listTerminal, showTerminal, show, create, update, retryProvisioning, seedReferenceData, getSeedingStatus, provisionAdmin, linkAdmin, updateAdmin, addAdmin, addFacility, provisionFacility, linkCore, removeAdmin, searchFacility, getCoreOrganizations, getV3Targets, previewMoveStack, moveStack, getStackMoves }
 }
