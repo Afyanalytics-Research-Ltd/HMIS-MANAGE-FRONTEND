@@ -27,6 +27,7 @@ const ROLE_ROUTES: { prefix: string; roles: string[] }[] = [
   { prefix: '/test-cases', roles: ['developer', 'tester', 'qa', 'provisioning_admin'] },
   { prefix: '/test-approvals', roles: ['developer', 'system_admin'] }, // devs approve too
   { prefix: '/systems', roles: ['system_admin'] },
+  { prefix: '/maintenance', roles: ['system_admin'] }, // can take the HMIS offline
   { prefix: '/tester-activity', roles: ['system_admin'] },
   { prefix: '/sha-claims', roles: ['system_admin'] }, // cross-tenant claim visibility
   // /run-history is open to all platform users — no rule needed.

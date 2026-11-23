@@ -127,6 +127,9 @@ export const useAuthStore = defineStore('auth', () => {
   const canRegisterHospitals = computed(() => isSystemAdmin.value || isProvisioningAdmin.value)
   // Who may approve/reject pending test cases (developers + system admin).
   const canApproveTests = computed(() => isSystemAdmin.value || isDeveloper.value)
+  // May activate, schedule, extend or end system maintenance. Deliberately
+  // system admin alone: a full window takes every hospital offline.
+  const canManageMaintenance = computed(() => isSystemAdmin.value)
 
   const applyToken = (t: string | null) => {
     if (t) $axios.defaults.headers.common['Authorization'] = `Bearer ${t}`
@@ -419,6 +422,7 @@ export const useAuthStore = defineStore('auth', () => {
     isSuperAccess,
     canAuthorTests,
     canApproveTests,
+    canManageMaintenance,
     login,
     selectSystemAndLogin,
     cancelSystemSelection,
