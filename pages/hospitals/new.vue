@@ -184,14 +184,22 @@ function clearDraft() {
 
 restoreDraft()
 
-// "Register in HMIS Manage" on a terminal hospital's page lands here with
-// ?target=&core_org_id=&name= — start a fresh wizard already pointed at that
-// existing organization (it wins over any half-finished draft).
+// ?target= — the system already chosen before getting here (the Hospitals
+// list's System filter, or a terminal hospital's page). The hospital is
+// created there; it wins over a half-finished draft's system.
+const prefillTarget = typeof route.query.target === 'string' ? route.query.target : ''
+if (prefillTarget && prefillTarget !== selectedTarget.value) {
+  selectedTarget.value = prefillTarget
+  selectedCoreOrgId.value = null // the draft's pick belonged to another system
+}
+
+// "Register in HMIS Manage" on a terminal hospital's page also sends
+// &core_org_id=&name= — start a fresh wizard already pointed at that
+// existing organization.
 const prefillCoreOrgId = Number(route.query.core_org_id)
 if (Number.isInteger(prefillCoreOrgId) && prefillCoreOrgId > 0) {
   step.value = 1
   useExistingOrg.value = true
-  selectedTarget.value = typeof route.query.target === 'string' ? route.query.target : ''
   selectedCoreOrgId.value = prefillCoreOrgId
   if (typeof route.query.name === 'string') form.name = route.query.name
 }

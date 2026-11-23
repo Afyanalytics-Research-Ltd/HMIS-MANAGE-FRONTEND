@@ -67,7 +67,9 @@ function openTerminal(item: { v3_target: string; id: string | number }) {
 
 // System (v3 stack) filter, shared by both tabs. '' = every system. The
 // registered list is filtered server-side; the terminal list in the browser.
-const system = ref('')
+// Kept in the URL (?system=) so it survives going to a hospital and back, and
+// so "New Hospital" can create the hospital in the system already selected.
+const system = ref(typeof route.query.system === 'string' ? route.query.system : '')
 const systemItems = computed(() => [
   { key: '', label: 'All systems' },
   ...store.v3Targets.map((t) => ({ key: t.key, label: t.label })),
@@ -75,10 +77,16 @@ const systemItems = computed(() => [
 // Only worth a column/filter once there is more than one system.
 const multiSystem = computed(() => store.v3Targets.length > 1)
 const isDefaultSystem = (key: string) => store.v3Targets.find((t) => t.key === key)?.default ?? false
-watch(system, () => {
+watch(system, (s) => {
   page.value = 1
   load()
+  if ((route.query.system ?? '') !== s) router.replace({ query: { ...route.query, system: s || undefined } })
 })
+// A system that isn't configured (stale link) falls back to all systems.
+watch(() => store.v3Targets, (targets) => {
+  if (system.value && targets.length && !targets.some((t) => t.key === system.value)) system.value = ''
+})
+const newHospitalLink = computed(() => (system.value ? { path: '/hospitals/new', query: { target: system.value } } : '/hospitals/new'))
 
 const terminalRows = computed(() => {
   const q = term.value.toLowerCase()
@@ -135,7 +143,7 @@ onMounted(() => {
         <h2 class="text-h4 font-weight-semibold">{{ heading }}</h2>
         <p class="textSecondary">{{ subtitle }}</p>
       </div>
-      <v-btn v-if="isPlatform" color="primary" prepend-icon="mdi-plus" to="/hospitals/new">
+      <v-btn v-if="isPlatform" color="primary" prepend-icon="mdi-plus" :to="newHospitalLink">
         New Hospital
       </v-btn>
     </div>
