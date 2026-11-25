@@ -45,6 +45,9 @@ export interface HospitalFacility {
   core_facility_id: string | null
   // Release key (regular, beta, ...); regular when none was chosen.
   release_mode?: string
+  // The facility's code in core-service, read live on the hospital page;
+  // typed to confirm a release change.
+  core_code?: string | null
   facility_code: string | null
   keph_level: string | null
   total_beds: number | null

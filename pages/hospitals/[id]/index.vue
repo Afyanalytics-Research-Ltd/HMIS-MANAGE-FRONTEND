@@ -54,7 +54,10 @@ async function syncFacilityReleases(orgId: string) {
     if (id.value !== orgId || !store.current) return
     for (const row of res.data) {
       const f = store.current.facilities.find((x) => x.id === row.facility_id)
-      if (f) f.release_mode = row.release_mode
+      if (f) {
+        f.release_mode = row.release_mode
+        f.core_code = row.core_code
+      }
     }
     releasesLive.value = res.live
     releasesMessage.value = res.message ?? ''
@@ -65,20 +68,53 @@ async function syncFacilityReleases(orgId: string) {
   }
 }
 
-async function changeRelease(f: HospitalFacility, mode: string) {
+// Choosing another release opens a confirmation: for a facility that is in
+// core-service the operator must type its code there (checked by the API
+// against core-service), so the wrong facility isn't moved by a slip.
+const releaseDialog = ref(false)
+const releaseTarget = ref<{ facility: HospitalFacility; mode: string } | null>(null)
+const releaseCode = ref('')
+const releaseCodeError = ref('')
+const releaseError = ref('')
+
+const releaseNeedsCode = computed(() => !!releaseTarget.value?.facility.core_facility_id)
+
+function changeRelease(f: HospitalFacility, mode: string) {
   if (!mode || mode === (f.release_mode || 'regular')) return
-  if (!confirm(`Move "${f.name}" to the ${releaseLabel(mode)} release? Its users get that build the next time they sign in.`)) return
+  releaseTarget.value = { facility: f, mode }
+  releaseCode.value = ''
+  releaseCodeError.value = ''
+  releaseError.value = ''
+  releaseDialog.value = true
+}
+
+async function confirmRelease() {
+  const target = releaseTarget.value
+  if (!target || savingReleaseFor.value) return
+  const { facility: f, mode } = target
+
+  const code = releaseCode.value.trim()
+  if (releaseNeedsCode.value && !code) {
+    releaseCodeError.value = 'Enter the facility code to confirm the change.'
+    return
+  }
 
   savingReleaseFor.value = f.id
+  releaseCodeError.value = ''
+  releaseError.value = ''
   try {
-    const res = await hospitalsApi.setFacilityRelease(id.value, f.id, mode)
+    const res = await hospitalsApi.setFacilityRelease(id.value, f.id, mode, releaseNeedsCode.value ? code : null)
     f.release_mode = res.data.release_mode
+    releaseDialog.value = false
     $showToast(res.core_updated
       ? `"${f.name}" is now on the ${releaseLabel(mode)} release.`
       : `"${f.name}" will be on the ${releaseLabel(mode)} release once it is in core-service.`)
   } catch (e: any) {
-    const errors = e?.response?.data?.errors?.release_mode
-    $showToast(errors?.[0] || e?.response?.data?.message || 'The release was not changed.')
+    const errors = e?.response?.data?.errors ?? {}
+    releaseCodeError.value = errors.facility_code?.[0] ?? ''
+    releaseError.value = releaseCodeError.value
+      ? ''
+      : errors.release_mode?.[0] || e?.response?.data?.message || 'The release was not changed.'
   } finally {
     savingReleaseFor.value = null
   }
@@ -575,6 +611,7 @@ watch(
             <v-card-text>
               <v-list density="compact" lines="two">
                 <v-list-item title="Core facility ID" :subtitle="f.core_facility_id || '—'" />
+                <v-list-item v-if="auth.isPlatformUser && f.core_facility_id" title="Core facility code" :subtitle="f.core_code || '—'" />
                 <v-list-item title="Facility code" :subtitle="f.facility_code || '—'" />
                 <v-list-item title="KEPH level" :subtitle="f.keph_level || '—'" />
                 <v-list-item v-if="!auth.isPlatformUser" title="Release" :subtitle="releaseLabel(f.release_mode)" />
@@ -740,6 +777,41 @@ watch(
       <!-- API credentials (system admins only — the backend enforces the same) -->
       <ApiCredentialsCard v-if="auth.isSystemAdmin" :hospital-id="id" :hospital-name="h.display_name || h.name" />
     </template>
+
+    <!-- Move a facility to another release: confirmed with its facility code -->
+    <v-dialog v-model="releaseDialog" max-width="480" :persistent="savingReleaseFor !== null">
+      <v-card v-if="releaseTarget" rounded="lg">
+        <v-card-title class="text-h6">Move to the {{ releaseLabel(releaseTarget.mode) }} release?</v-card-title>
+        <v-card-text>
+          <p class="mb-3">
+            Move <strong>"{{ releaseTarget.facility.name }}"</strong> to the
+            <strong>{{ releaseLabel(releaseTarget.mode) }}</strong> release? Its users get that build the next
+            time they sign in.
+          </p>
+          <v-alert type="warning" variant="tonal" density="compact" class="mb-4" text="Please note that this is irreversible." />
+          <v-text-field
+            v-if="releaseNeedsCode" v-model="releaseCode" label="Facility code" autofocus
+            hint="Type this facility's code in core-service to confirm." persistent-hint
+            :error-messages="releaseCodeError" :disabled="savingReleaseFor !== null"
+            prepend-inner-icon="mdi-shield-key-outline" variant="outlined" density="comfortable"
+            autocomplete="off" @keyup.enter="confirmRelease"
+          />
+          <p v-else class="text-body-2 textSecondary">
+            This facility is not in core-service yet, so there is no facility code to check. The release is
+            recorded here and applied when the facility is provisioned.
+          </p>
+          <v-alert v-if="releaseError" type="error" variant="tonal" density="compact" class="mt-3" :text="releaseError" />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" :disabled="savingReleaseFor !== null" @click="releaseDialog = false">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" :loading="savingReleaseFor !== null"
+            :disabled="releaseNeedsCode && !releaseCode.trim()" @click="confirmRelease">
+            Move facility
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <!-- Deactivate / reactivate confirmation dialog -->
     <v-dialog v-model="confirmToggleStatus" max-width="440">

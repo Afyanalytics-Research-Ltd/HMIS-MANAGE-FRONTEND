@@ -110,15 +110,17 @@ export function useHospitalsApi() {
 
   // Each facility's release as core-service has it now. live = false when
   // core-service couldn't be asked: the values hmis-manage stored come back.
-  async function getFacilityReleases(id: string): Promise<{ data: { facility_id: string; release_mode: string }[]; live: boolean; message: string | null }> {
+  async function getFacilityReleases(id: string): Promise<{ data: { facility_id: string; release_mode: string; core_code: string | null }[]; live: boolean; message: string | null }> {
     const { data } = await $axios.get(`/v1/platform/hospitals/${id}/facility-releases`)
     return data
   }
 
   // Move a facility to another release of its hospital's system (changed in
   // core-service first when the facility is there).
-  async function setFacilityRelease(id: string, facilityId: string, releaseMode: string): Promise<{ data: HospitalFacility; core_updated: boolean }> {
-    const { data } = await $axios.patch(`/v1/platform/hospitals/${id}/facilities/${facilityId}/release`, { release_mode: releaseMode })
+  // facilityCode is the facility's code in core-service, typed by the
+  // operator to confirm; null for a facility that isn't in core-service yet.
+  async function setFacilityRelease(id: string, facilityId: string, releaseMode: string, facilityCode: string | null): Promise<{ data: HospitalFacility; core_updated: boolean }> {
+    const { data } = await $axios.patch(`/v1/platform/hospitals/${id}/facilities/${facilityId}/release`, { release_mode: releaseMode, facility_code: facilityCode })
     return data
   }
 
