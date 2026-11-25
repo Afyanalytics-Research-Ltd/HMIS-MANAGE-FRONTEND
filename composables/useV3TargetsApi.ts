@@ -59,6 +59,15 @@ export interface V3ReleaseRow {
   v3_target_label?: string
 }
 
+// Whether the system's core-service holds the release app URLs saved here
+// (it gives them out at sign-in, and the ERP frontend redirects to them).
+// synced | pending (not sent yet) | failed (sending didn't work) |
+// unavailable (core-service unreachable or too old).
+export interface ReleaseCoreSync {
+  state: 'synced' | 'pending' | 'failed' | 'unavailable'
+  message: string | null
+}
+
 export type V3ReleaseInput = Partial<Pick<V3ReleaseRow, 'key' | 'label' | 'app_url' | 'cookie_domain' | 'notes' | 'active'>>
 
 export function useV3TargetsApi() {
@@ -95,6 +104,18 @@ export function useV3TargetsApi() {
     return data.data
   }
 
+  // The releases plus whether core-service has their app URLs.
+  async function getReleases(key: string): Promise<{ data: V3ReleaseRow[]; core_sync: ReleaseCoreSync | null }> {
+    const { data } = await $axios.get(`/v1/platform/v3-targets/${key}/releases`)
+    return { data: data.data, core_sync: data.core_sync ?? null }
+  }
+
+  // Send the saved app URLs to the system's core-service again.
+  async function syncReleases(key: string): Promise<ReleaseCoreSync> {
+    const { data } = await $axios.post(`/v1/platform/v3-targets/${key}/releases/sync`)
+    return data.core_sync
+  }
+
   async function createRelease(key: string, input: V3ReleaseInput): Promise<V3ReleaseRow> {
     const { data } = await $axios.post(`/v1/platform/v3-targets/${key}/releases`, input)
     return data.data
@@ -109,5 +130,5 @@ export function useV3TargetsApi() {
     await $axios.delete(`/v1/platform/v3-targets/${key}/releases/${release}`)
   }
 
-  return { list, create, update, remove, testConnection, listReleases, createRelease, updateRelease, removeRelease }
+  return { list, create, update, remove, testConnection, listReleases, getReleases, syncReleases, createRelease, updateRelease, removeRelease }
 }
