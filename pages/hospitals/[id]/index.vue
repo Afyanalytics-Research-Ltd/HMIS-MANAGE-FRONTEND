@@ -5,7 +5,8 @@ import { useNuxtApp } from '#app'
 import { useHospitalsStore } from '@/stores/hospitals'
 import { useAuthStore } from '@/stores/auth'
 import { useDeploymentsStore } from '@/stores/deployments'
-import { STATUS_COLOR, TIER_COLOR, BILLING_COLOR, type HospitalAdminUser } from '@/types/hospital'
+import { useHospitalsApi } from '@/composables/useHospitalsApi'
+import { STATUS_COLOR, TIER_COLOR, BILLING_COLOR, type HospitalAdminUser, type HospitalFacility } from '@/types/hospital'
 import type { Deployment } from '@/types/deployment'
 import ApiCredentialsCard from '@/components/hospitals/ApiCredentialsCard.vue'
 import AddFacilityDialog from '@/components/hospitals/AddFacilityDialog.vue'
@@ -24,6 +25,64 @@ const h = computed(() => store.current)
 const releaseLabel = (key?: string) =>
   store.releases.find((r) => r.key === (key || 'regular') && r.v3_target === h.value?.v3_target)?.label ?? (key || 'regular')
 if (auth.isPlatformUser && !store.releases.length) store.fetchReleases()
+
+// Each facility's release switch. The value shown is read live from
+// core-service after the hospital loads (the stored one can be stale: a
+// release changed with the server command); changing it updates core-service.
+const hospitalsApi = useHospitalsApi()
+// null = still checking, true = from core-service, false = stored values only.
+const releasesLive = ref<boolean | null>(null)
+const releasesMessage = ref('')
+const savingReleaseFor = ref<string | null>(null)
+
+// The system's active releases, plus the facility's current one when it is
+// retired or not defined here (so the switch can still show it).
+function releaseItemsFor(f: HospitalFacility) {
+  const current = f.release_mode || 'regular'
+  const items = store.releases
+    .filter((r) => r.v3_target === h.value?.v3_target && (r.active || r.key === current))
+    .map((r) => ({ key: r.key, label: r.active ? r.label : `${r.label} (retired)` }))
+  if (!items.some((r) => r.key === current)) items.push({ key: current, label: current })
+  return items
+}
+
+async function syncFacilityReleases(orgId: string) {
+  releasesLive.value = null
+  releasesMessage.value = ''
+  try {
+    const res = await hospitalsApi.getFacilityReleases(orgId)
+    if (id.value !== orgId || !store.current) return
+    for (const row of res.data) {
+      const f = store.current.facilities.find((x) => x.id === row.facility_id)
+      if (f) f.release_mode = row.release_mode
+    }
+    releasesLive.value = res.live
+    releasesMessage.value = res.message ?? ''
+  } catch {
+    if (id.value !== orgId) return
+    releasesLive.value = false
+    releasesMessage.value = 'Could not check the releases with core-service.'
+  }
+}
+
+async function changeRelease(f: HospitalFacility, mode: string) {
+  if (!mode || mode === (f.release_mode || 'regular')) return
+  if (!confirm(`Move "${f.name}" to the ${releaseLabel(mode)} release? Its users get that build the next time they sign in.`)) return
+
+  savingReleaseFor.value = f.id
+  try {
+    const res = await hospitalsApi.setFacilityRelease(id.value, f.id, mode)
+    f.release_mode = res.data.release_mode
+    $showToast(res.core_updated
+      ? `"${f.name}" is now on the ${releaseLabel(mode)} release.`
+      : `"${f.name}" will be on the ${releaseLabel(mode)} release once it is in core-service.`)
+  } catch (e: any) {
+    const errors = e?.response?.data?.errors?.release_mode
+    $showToast(errors?.[0] || e?.response?.data?.message || 'The release was not changed.')
+  } finally {
+    savingReleaseFor.value = null
+  }
+}
 
 const addressLines = computed(() => {
   const a = h.value?.address
@@ -257,7 +316,10 @@ watch(
     addFacilityDialog.value = false
     confirmDeleteAdmin.value = null
     deployment.value = null
-    store.fetchOne(newId)
+    releasesLive.value = null
+    store.fetchOne(newId).then(() => {
+      if (auth.isPlatformUser && id.value === newId) syncFacilityReleases(newId)
+    })
     checkDeployment()
   },
   { immediate: true },
@@ -515,8 +577,19 @@ watch(
                 <v-list-item title="Core facility ID" :subtitle="f.core_facility_id || '—'" />
                 <v-list-item title="Facility code" :subtitle="f.facility_code || '—'" />
                 <v-list-item title="KEPH level" :subtitle="f.keph_level || '—'" />
-                <v-list-item title="Release" :subtitle="releaseLabel(f.release_mode)" />
+                <v-list-item v-if="!auth.isPlatformUser" title="Release" :subtitle="releaseLabel(f.release_mode)" />
               </v-list>
+
+              <template v-if="auth.isPlatformUser">
+                <v-select
+                  :model-value="f.release_mode || 'regular'" :items="releaseItemsFor(f)" item-title="label" item-value="key"
+                  label="Release" prepend-inner-icon="mdi-source-branch" variant="outlined" density="compact"
+                  :loading="savingReleaseFor === f.id || releasesLive === null" :disabled="savingReleaseFor !== null"
+                  :hint="releasesLive === false ? `${releasesMessage} Showing the last value saved here.` : 'Which build of the ERP this facility gets. Changing it takes effect at the next sign-in.'"
+                  persistent-hint class="mt-2 mb-2" style="max-width: 420px"
+                  @update:model-value="changeRelease(f, $event)"
+                />
+              </template>
 
               <p class="text-caption textSecondary text-uppercase mt-2 mb-1">Bed occupancy</p>
               <v-row dense>

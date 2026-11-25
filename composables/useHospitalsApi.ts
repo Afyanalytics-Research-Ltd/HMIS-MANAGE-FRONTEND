@@ -1,6 +1,7 @@
 import { useNuxtApp } from '#app'
 import type {
   SystemRelease,
+  HospitalFacility,
   CoreOrganization,
   CreateAdminPayload,
   HospitalFacilityPayload,
@@ -107,6 +108,20 @@ export function useHospitalsApi() {
     return data
   }
 
+  // Each facility's release as core-service has it now. live = false when
+  // core-service couldn't be asked: the values hmis-manage stored come back.
+  async function getFacilityReleases(id: string): Promise<{ data: { facility_id: string; release_mode: string }[]; live: boolean; message: string | null }> {
+    const { data } = await $axios.get(`/v1/platform/hospitals/${id}/facility-releases`)
+    return data
+  }
+
+  // Move a facility to another release of its hospital's system (changed in
+  // core-service first when the facility is there).
+  async function setFacilityRelease(id: string, facilityId: string, releaseMode: string): Promise<{ data: HospitalFacility; core_updated: boolean }> {
+    const { data } = await $axios.patch(`/v1/platform/hospitals/${id}/facilities/${facilityId}/release`, { release_mode: releaseMode })
+    return data
+  }
+
   async function addAdmin(id: string, payload: CreateAdminPayload): Promise<CreateAdminResponse> {
     const { data } = await $axios.post<CreateAdminResponse>(`/v1/platform/hospitals/${id}/admins`, payload)
     return data
@@ -189,5 +204,5 @@ export function useHospitalsApi() {
     return data.data
   }
 
-  return { list, listTerminal, showTerminal, show, create, update, retryProvisioning, seedReferenceData, getSeedingStatus, provisionAdmin, linkAdmin, updateAdmin, addAdmin, addFacility, provisionFacility, linkCore, removeAdmin, searchFacility, getCoreOrganizations, getV3Targets, getReleases, previewMoveStack, moveStack, getStackMoves }
+  return { list, listTerminal, showTerminal, show, create, update, retryProvisioning, seedReferenceData, getSeedingStatus, provisionAdmin, linkAdmin, updateAdmin, addAdmin, addFacility, provisionFacility, getFacilityReleases, setFacilityRelease, linkCore, removeAdmin, searchFacility, getCoreOrganizations, getV3Targets, getReleases, previewMoveStack, moveStack, getStackMoves }
 }
