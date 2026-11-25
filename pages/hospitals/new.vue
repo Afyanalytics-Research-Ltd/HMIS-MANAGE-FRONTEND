@@ -74,6 +74,17 @@ const facility = reactive<HospitalFacilityPayload>({
   facility_administrator_email: '',
   facility_administrator_phone: '',
   facility_administrator_identifier: '',
+  release_mode: 'regular',
+})
+
+// The chosen system's active releases (regular, beta, ... — set up on the
+// Systems page). A release the newly picked system doesn't have falls back
+// to regular.
+const releaseItems = computed(() =>
+  store.releases.filter((r) => r.v3_target === selectedTarget.value && r.active).map((r) => ({ key: r.key, label: r.label })),
+)
+watch(releaseItems, (items) => {
+  if (items.length && !items.some((r) => r.key === facility.release_mode)) facility.release_mode = 'regular'
 })
 
 const addAdmin = ref(true)
@@ -209,6 +220,7 @@ if (Number.isInteger(prefillCoreOrgId) && prefillCoreOrgId > 0) {
 store.fetchV3Targets().then(() => {
   if (!selectedTarget.value) selectedTarget.value = store.v3Targets.find((t) => t.default)?.key ?? ''
 })
+store.fetchReleases()
 store.fetchCoreOrganizations(selectedTarget.value || undefined)
 
 // Organizations belong to one system: switching it clears the pick and
@@ -395,7 +407,11 @@ async function submit(confirmedSimilar = false) {
     name: form.name,
     address: cleaned(form.address || {}) as any,
   }
-  if (addFacility.value && facility.name) payload.facility = { ...cleaned(facility), name: facility.name }
+  if (addFacility.value && facility.name) {
+    payload.facility = { ...cleaned(facility), name: facility.name }
+    // Releases couldn't be loaded: let the server default to regular.
+    if (!releaseItems.value.length) delete payload.facility.release_mode
+  }
   if (addAdmin.value) payload.admin = { ...admin }
   if (deploymentId) payload.deployment_id = deploymentId
   if (useExistingOrg.value && selectedCoreOrgId.value) payload.existing_core_org_id = selectedCoreOrgId.value
@@ -693,6 +709,11 @@ function done() {
               <v-text-field v-model="facility.facility_code" :disabled="!addFacility" :label="isDefaultTarget ? 'Master facility code' : 'Master facility code (optional)'" variant="outlined" density="comfortable" hide-details="auto" style="min-width:220px" />
               <v-text-field v-model="facility.keph_level" :disabled="!addFacility" :readonly="shaEnabled" label="KEPH level" placeholder="e.g. Level 4" variant="outlined" density="comfortable" hide-details="auto" style="min-width:220px" />
             </div>
+            <v-select v-if="releaseItems.length" v-model="facility.release_mode" :disabled="!addFacility" :items="releaseItems"
+              item-title="label" item-value="key" label="Release" prepend-inner-icon="mdi-source-branch" variant="outlined"
+              density="comfortable" class="mb-3"
+              :hint="`Which build of the ERP this facility's users get. ${selectedTargetLabel}'s releases are set up on the Systems page.`"
+              persistent-hint />
 
             <h4 class="text-subtitle-1 font-weight-medium mt-4 mb-2">Bed Occupancy</h4>
             <div class="d-flex ga-3 mb-3 flex-wrap">

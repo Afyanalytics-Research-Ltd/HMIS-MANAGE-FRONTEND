@@ -42,6 +42,25 @@ export interface V3TestResult {
   organizations: number | null
 }
 
+// One release of a stack (regular, beta, ...) — V3Release::present().
+export interface V3ReleaseRow {
+  id: number
+  v3_target: string
+  key: string
+  label: string
+  app_url: string | null
+  cookie_domain: string | null
+  notes: string | null
+  active: boolean
+  // "regular": can't be removed or retired.
+  protected: boolean
+  // Facilities registered here that are on it (only shown by the Systems page).
+  facilities?: number
+  v3_target_label?: string
+}
+
+export type V3ReleaseInput = Partial<Pick<V3ReleaseRow, 'key' | 'label' | 'app_url' | 'cookie_domain' | 'notes' | 'active'>>
+
 export function useV3TargetsApi() {
   const { $axios } = useNuxtApp()
 
@@ -71,5 +90,24 @@ export function useV3TargetsApi() {
     return { stack: data.data, result: data.result }
   }
 
-  return { list, create, update, remove, testConnection }
+  async function listReleases(key: string): Promise<V3ReleaseRow[]> {
+    const { data } = await $axios.get(`/v1/platform/v3-targets/${key}/releases`)
+    return data.data
+  }
+
+  async function createRelease(key: string, input: V3ReleaseInput): Promise<V3ReleaseRow> {
+    const { data } = await $axios.post(`/v1/platform/v3-targets/${key}/releases`, input)
+    return data.data
+  }
+
+  async function updateRelease(key: string, release: string, input: V3ReleaseInput): Promise<V3ReleaseRow> {
+    const { data } = await $axios.patch(`/v1/platform/v3-targets/${key}/releases/${release}`, input)
+    return data.data
+  }
+
+  async function removeRelease(key: string, release: string): Promise<void> {
+    await $axios.delete(`/v1/platform/v3-targets/${key}/releases/${release}`)
+  }
+
+  return { list, create, update, remove, testConnection, listReleases, createRelease, updateRelease, removeRelease }
 }

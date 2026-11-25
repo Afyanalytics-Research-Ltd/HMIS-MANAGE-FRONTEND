@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useNuxtApp } from '#app'
 import { useV3TargetsApi, type V3Stack, type V3StackInput, type V3ServiceKey } from '@/composables/useV3TargetsApi'
+import SystemReleasesDialog from '@/components/systems/SystemReleasesDialog.vue'
 
 // The v3 stacks hospitals are provisioned into (a hospital picks one in the
 // Register Hospital wizard) and each stack's service connections. Values set
@@ -29,6 +30,14 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+// ── Releases (regular, beta, ...) of one stack ────────────────────────────
+const releasesFor = ref<V3Stack | null>(null)
+const releasesOpen = ref(false)
+function openReleases(stack: V3Stack) {
+  releasesFor.value = stack
+  releasesOpen.value = true
 }
 
 function replace(updated: V3Stack) {
@@ -234,6 +243,7 @@ onMounted(load)
       <template #item.actions="{ item }">
         <div class="d-flex justify-end ga-2">
           <v-btn size="small" variant="text" prepend-icon="mdi-connection" @click="openEdit(item)">Connections</v-btn>
+          <v-btn size="small" variant="text" prepend-icon="mdi-source-branch" @click="openReleases(item)">Releases</v-btn>
           <v-btn size="small" variant="text" prepend-icon="mdi-lan-check" :disabled="!item.services.core.configured"
             :loading="testing === item.key" @click="test(item)">Test</v-btn>
         </div>
@@ -297,6 +307,8 @@ onMounted(load)
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <SystemReleasesDialog v-model="releasesOpen" :stack="releasesFor" />
   </v-card>
 </template>
 

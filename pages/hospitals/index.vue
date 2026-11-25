@@ -87,16 +87,23 @@ watch(system, (s) => {
 watch(() => store.v3Targets, (targets) => {
   if (system.value && targets.length && !targets.some((t) => t.key === system.value)) system.value = ''
 })
-// Release filter: hospitals with at least one facility on the beta or the
-// regular release (set per facility on core-service). The registered list is
-// filtered server-side (it asks each system's core-service); the terminal list
-// in the browser, from each row's release_modes. Kept in the URL (?release=).
-const release = ref<'' | ReleaseMode>(route.query.release === 'beta' || route.query.release === 'regular' ? route.query.release : '')
-const releaseItems = [
-  { key: '', label: 'All releases' },
-  { key: 'beta', label: 'Beta' },
-  { key: 'regular', label: 'Regular' },
-]
+// Release filter: hospitals with at least one facility on a release (regular,
+// beta, or any release added on the Systems page; set per facility on
+// core-service). The registered list is filtered server-side (it asks each
+// system's core-service); the terminal list in the browser, from each row's
+// release_modes. Kept in the URL (?release=).
+const release = ref<'' | ReleaseMode>(typeof route.query.release === 'string' ? route.query.release : '')
+// The selected system's releases, or every system's (one entry per key).
+const releaseItems = computed(() => {
+  const seen = new Map<string, string>()
+  for (const r of store.releases) {
+    if (system.value && r.v3_target !== system.value) continue
+    if (!seen.has(r.key)) seen.set(r.key, r.active ? r.label : `${r.label} (retired)`)
+  }
+  return [{ key: '', label: 'All releases' }, ...[...seen].map(([key, label]) => ({ key, label }))]
+})
+// Name of a release key for chips (the key itself when it isn't defined here).
+const releaseLabel = (key: string) => store.releases.find((r) => r.key === key)?.label ?? key
 watch(release, (r) => {
   page.value = 1
   load()
@@ -158,7 +165,10 @@ function openHospital(id: string) {
 
 onMounted(() => {
   load()
-  if (isPlatform.value) store.fetchV3Targets()
+  if (isPlatform.value) {
+    store.fetchV3Targets()
+    store.fetchReleases()
+  }
 })
 </script>
 
@@ -330,8 +340,8 @@ onMounted(() => {
           </template>
           <template #item.release_modes="{ item }">
             <template v-if="item.release_modes?.length">
-              <v-chip v-for="m in item.release_modes" :key="m" :color="m === 'beta' ? 'warning' : undefined" size="small"
-                variant="tonal" label class="mr-1">{{ m }}</v-chip>
+              <v-chip v-for="m in item.release_modes" :key="m" :color="m === 'regular' ? undefined : 'warning'" size="small"
+                variant="tonal" label class="mr-1">{{ releaseLabel(m) }}</v-chip>
             </template>
             <span v-else class="textSecondary">—</span>
           </template>
