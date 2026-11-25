@@ -20,6 +20,10 @@ const { $showToast } = useNuxtApp()
 
 const id = computed(() => String(route.params.id))
 const h = computed(() => store.current)
+// A facility's release as named on its hospital's system (Systems page).
+const releaseLabel = (key?: string) =>
+  store.releases.find((r) => r.key === (key || 'regular') && r.v3_target === h.value?.v3_target)?.label ?? (key || 'regular')
+if (auth.isPlatformUser && !store.releases.length) store.fetchReleases()
 
 const addressLines = computed(() => {
   const a = h.value?.address
@@ -511,6 +515,7 @@ watch(
                 <v-list-item title="Core facility ID" :subtitle="f.core_facility_id || '—'" />
                 <v-list-item title="Facility code" :subtitle="f.facility_code || '—'" />
                 <v-list-item title="KEPH level" :subtitle="f.keph_level || '—'" />
+                <v-list-item title="Release" :subtitle="releaseLabel(f.release_mode)" />
               </v-list>
 
               <p class="text-caption textSecondary text-uppercase mt-2 mb-1">Bed occupancy</p>
@@ -753,7 +758,7 @@ watch(
     </v-dialog>
 
     <!-- Add facility dialog -->
-    <AddFacilityDialog v-model="addFacilityDialog" :org-id="id" />
+    <AddFacilityDialog v-model="addFacilityDialog" :org-id="id" :target="h?.v3_target" />
 
     <!-- Move to another v3 stack -->
     <!-- Not v-if on h: the hospital reloads after a move, and the dialog

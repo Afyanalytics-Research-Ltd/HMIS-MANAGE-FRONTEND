@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useNuxtApp } from '#app'
 import { useHospitalsStore } from '@/stores/hospitals'
 import { useHospitalsApi } from '@/composables/useHospitalsApi'
@@ -10,7 +10,8 @@ import type { FacilityRegistryResult, HospitalFacilityPayload } from '@/types/ho
 // integration rule as the register-hospital wizard's First Facility step:
 // SHA on → DHA registry lookup, and the fields it fills are read-only;
 // SHA off → no lookup, every field typed by hand.
-const props = defineProps<{ orgId: string }>()
+// target: the hospital's system — the release picker offers its active releases.
+const props = defineProps<{ orgId: string; target?: string | null }>()
 const open = defineModel<boolean>({ required: true })
 
 const store = useHospitalsStore()
@@ -34,8 +35,14 @@ const emptyForm = (): HospitalFacilityPayload => ({
   facility_administrator_email: '',
   facility_administrator_phone: '',
   facility_administrator_identifier: '',
+  release_mode: 'regular',
 })
 const form = reactive<HospitalFacilityPayload>(emptyForm())
+
+// Releases (regular, beta, ...) are defined per system on the Systems page.
+const releaseItems = computed(() =>
+  store.releases.filter((r) => r.v3_target === props.target && r.active).map((r) => ({ key: r.key, label: r.label })),
+)
 
 const dhaIdentifier = ref('')
 const dhaSearching = ref(false)
@@ -60,6 +67,7 @@ watch(open, (isOpen) => {
   dhaStatus.value = ''
   store.fieldErrors = {}
   store.error = ''
+  if (!store.releases.length) store.fetchReleases()
   settingsApi
     .get()
     .then((s) => (shaEnabled.value = s.sha_integration_enabled))
@@ -127,6 +135,8 @@ async function save() {
   const payload = Object.fromEntries(
     Object.entries(form).filter(([, v]) => v !== '' && v !== undefined && v !== null),
   ) as unknown as HospitalFacilityPayload
+  // Releases couldn't be loaded: let the server default to regular.
+  if (!releaseItems.value.length) delete payload.release_mode
 
   const res = await store.addFacility(props.orgId, payload)
   if (!res.success) return
@@ -178,6 +188,11 @@ async function save() {
           <v-text-field v-model="form.keph_level" :readonly="shaEnabled" label="KEPH level" placeholder="e.g. Level 4"
             variant="outlined" density="comfortable" hide-details="auto" style="min-width:220px" :error-messages="fieldError('keph_level')" />
         </div>
+
+        <v-select v-if="releaseItems.length" v-model="form.release_mode" :items="releaseItems" item-title="label"
+          item-value="key" label="Release" prepend-inner-icon="mdi-source-branch" variant="outlined" density="comfortable"
+          hint="Which build of the ERP this facility's users get. Releases are set up per system on the Systems page."
+          persistent-hint class="mb-3" :error-messages="fieldError('release_mode')" />
 
         <h4 class="text-subtitle-1 font-weight-medium mt-2 mb-2">Bed Occupancy</h4>
         <v-row dense class="mb-2">

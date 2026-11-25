@@ -1,5 +1,6 @@
 import { useNuxtApp } from '#app'
 import type {
+  SystemRelease,
   CoreOrganization,
   CreateAdminPayload,
   HospitalFacilityPayload,
@@ -160,6 +161,13 @@ export function useHospitalsApi() {
 
   // The v3 systems (production, data-migration, ...) a hospital can be
   // provisioned into — feeds the "System" picker on the register wizard.
+  // Every available system's releases (regular, beta, ...) — managed on the
+  // Systems page; used by the Release filter and the facility forms.
+  async function getReleases(): Promise<SystemRelease[]> {
+    const { data } = await $axios.get<{ data: SystemRelease[] }>('/v1/platform/hospitals/releases')
+    return data.data
+  }
+
   async function getV3Targets(): Promise<V3Target[]> {
     const { data } = await $axios.get<{ data: V3Target[] }>('/v1/platform/hospitals/v3-targets')
     return data.data
@@ -181,5 +189,5 @@ export function useHospitalsApi() {
     return data.data
   }
 
-  return { list, listTerminal, showTerminal, show, create, update, retryProvisioning, seedReferenceData, getSeedingStatus, provisionAdmin, linkAdmin, updateAdmin, addAdmin, addFacility, provisionFacility, linkCore, removeAdmin, searchFacility, getCoreOrganizations, getV3Targets, previewMoveStack, moveStack, getStackMoves }
+  return { list, listTerminal, showTerminal, show, create, update, retryProvisioning, seedReferenceData, getSeedingStatus, provisionAdmin, linkAdmin, updateAdmin, addAdmin, addFacility, provisionFacility, linkCore, removeAdmin, searchFacility, getCoreOrganizations, getV3Targets, getReleases, previewMoveStack, moveStack, getStackMoves }
 }

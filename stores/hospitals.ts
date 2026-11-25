@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useHospitalsApi } from '~/composables/useHospitalsApi'
-import type { CoreOrganization, CreateAdminPayload, CreateHospitalPayload, CreateHospitalResponse, ExistingCoreAccount, Hospital, HospitalDetail, HospitalFacilityPayload, PaginationMeta, ProvisionAdminResponse, RetryProvisioningResponse, SeedingStatusResponse, SimilarOrganization, TerminalHospital, UpdateAdminPayload, UpdateHospitalPayload, V3Target, LinkCorePayload } from '~/types/hospital'
+import type { CoreOrganization, CreateAdminPayload, CreateHospitalPayload, CreateHospitalResponse, ExistingCoreAccount, Hospital, HospitalDetail, HospitalFacilityPayload, PaginationMeta, ProvisionAdminResponse, SystemRelease, RetryProvisioningResponse, SeedingStatusResponse, SimilarOrganization, TerminalHospital, UpdateAdminPayload, UpdateHospitalPayload, V3Target, LinkCorePayload } from '~/types/hospital'
 export const useHospitalsStore = defineStore('hospitals', () => {
   const api = useHospitalsApi()
 
@@ -132,6 +132,16 @@ export const useHospitalsStore = defineStore('hospitals', () => {
       error.value = err?.response?.data?.message || 'Failed to load organizations.'
     } finally {
       loadingCoreOrganizations.value = false
+    }
+  }
+
+  // Releases of every system (see SystemRelease). Loaded once per page.
+  const releases = ref<SystemRelease[]>([])
+  async function fetchReleases() {
+    try {
+      releases.value = await api.getReleases()
+    } catch {
+      releases.value = []
     }
   }
 
@@ -486,7 +496,7 @@ export const useHospitalsStore = defineStore('hospitals', () => {
     provisioningAdminId, lastAdminProvisionResult, updatingAdminId, lastAdminUpdateResult, addingAdmin, addingFacility, linkingCore, provisioningFacilityId, removingAdminId,
     pendingCoreAccountLink, linkingAdmin,
     lastCreateResult, lastRetryResult, seeding, lastSeedResult,
-    coreOrganizations, loadingCoreOrganizations, v3Targets,
+    coreOrganizations, loadingCoreOrganizations, v3Targets, releases, fetchReleases,
     terminalItems, loadingTerminal, terminalError, terminalUnavailable, fetchTerminal,
     listUnavailable, fetchList, fetchOne, create, update, retryProvisioning, seedReferenceData, provisionAdmin, linkAdmin, cancelCoreAccountLink, updateAdmin, addAdmin, addFacility, provisionFacility, linkCore, removeAdmin, setActive,
     fetchCoreOrganizations, fetchV3Targets,

@@ -43,6 +43,8 @@ export interface HospitalFacility {
   name: string
   status: string
   core_facility_id: string | null
+  // Release key (regular, beta, ...); regular when none was chosen.
+  release_mode?: string
   facility_code: string | null
   keph_level: string | null
   total_beds: number | null
@@ -168,7 +170,23 @@ export interface TerminalHospital {
   release_modes?: ReleaseMode[]
 }
 
-export type ReleaseMode = 'beta' | 'regular'
+// A release key: 'regular', 'beta' or any release a system admin added on
+// the Systems page.
+export type ReleaseMode = string
+
+// One release of one system (GET /hospitals/releases).
+export interface SystemRelease {
+  id: number
+  v3_target: string
+  v3_target_label: string
+  key: string
+  label: string
+  app_url: string | null
+  cookie_domain: string | null
+  notes: string | null
+  active: boolean
+  protected: boolean
+}
 
 // GET /hospitals/terminal/{target}/{coreOrgId} — one terminal hospital as
 // core-service describes it. facilities/users/admins are null when that
@@ -248,6 +266,8 @@ export interface HospitalFacilityPayload {
   facility_administrator_email?: string
   facility_administrator_phone?: string
   facility_administrator_identifier?: string
+  // One of the system's active releases; omitted = regular.
+  release_mode?: string
 }
 
 // Raw shape returned by the DHA SHA HIE facility registry
