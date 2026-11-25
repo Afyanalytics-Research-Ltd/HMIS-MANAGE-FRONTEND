@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useHospitalsStore } from '@/stores/hospitals'
 import { useAuthStore } from '@/stores/auth'
 import { STATUS_COLOR, TIER_COLOR, BILLING_COLOR } from '@/types/hospital'
+import type { ReleaseMode } from '@/types/hospital'
 
 const router = useRouter()
 const route = useRoute()
@@ -86,11 +87,35 @@ watch(system, (s) => {
 watch(() => store.v3Targets, (targets) => {
   if (system.value && targets.length && !targets.some((t) => t.key === system.value)) system.value = ''
 })
+// Release filter: hospitals with at least one facility on the beta or the
+// regular release (set per facility on core-service). The registered list is
+// filtered server-side (it asks each system's core-service); the terminal list
+// in the browser, from each row's release_modes. Kept in the URL (?release=).
+const release = ref<'' | ReleaseMode>(route.query.release === 'beta' || route.query.release === 'regular' ? route.query.release : '')
+const releaseItems = [
+  { key: '', label: 'All releases' },
+  { key: 'beta', label: 'Beta' },
+  { key: 'regular', label: 'Regular' },
+]
+watch(release, (r) => {
+  page.value = 1
+  load()
+  if ((route.query.release ?? '') !== r) router.replace({ query: { ...route.query, release: r || undefined } })
+})
+// Terminal systems whose core-service doesn't report release modes yet - they
+// can't be filtered, so their tenants drop out while a release is picked.
+const terminalNoRelease = computed(() =>
+  release.value
+    ? [...new Set(store.terminalItems.filter((t) => !Array.isArray(t.release_modes)).map((t) => t.v3_target_label))]
+    : [],
+)
+
 const newHospitalLink = computed(() => (system.value ? { path: '/hospitals/new', query: { target: system.value } } : '/hospitals/new'))
 
 const terminalRows = computed(() => {
   const q = term.value.toLowerCase()
-  const items = system.value ? store.terminalItems.filter((t) => t.v3_target === system.value) : store.terminalItems
+  let items = system.value ? store.terminalItems.filter((t) => t.v3_target === system.value) : store.terminalItems
+  if (release.value) items = items.filter((t) => t.release_modes?.includes(release.value as ReleaseMode))
   if (!q) return items
   return items.filter(
     (t) => [t.name, t.code].some((v) => v?.toLowerCase().includes(q)) || String(t.id).startsWith(q),
@@ -101,6 +126,7 @@ const terminalHeaders = computed(() => [
   { title: 'Hospital', key: 'name', sortable: true },
   ...(multiSystem.value ? [{ title: 'System', key: 'v3_target_label', sortable: true }] : []),
   { title: 'Code', key: 'code', sortable: true },
+  { title: 'Release', key: 'release_modes', sortable: false },
   { title: 'Status', key: 'status', sortable: true },
   { title: '', key: 'actions', sortable: false, align: 'end' as const },
 ])
@@ -117,7 +143,7 @@ const headers = computed(() => [
 ])
 
 async function load() {
-  await store.fetchList(page.value, perPage.value, search.value, system.value)
+  await store.fetchList(page.value, perPage.value, search.value, system.value, release.value)
 }
 
 function onTableUpdate(opts: { page: number; itemsPerPage: number }) {
@@ -182,7 +208,21 @@ onMounted(() => {
           hide-details
           style="max-width: 240px; min-width: 180px"
         />
+        <v-select
+          v-model="release"
+          :items="releaseItems"
+          item-title="label"
+          item-value="key"
+          prepend-inner-icon="mdi-flask-outline"
+          variant="outlined"
+          density="compact"
+          hide-details
+          style="max-width: 200px; min-width: 160px"
+        />
       </div>
+      <v-alert v-if="tab === 'registered' && release && store.listUnavailable.length" type="warning" variant="tonal"
+        density="compact" class="mx-4 mt-4"
+        :text="`Couldn't check facility releases on ${store.listUnavailable.join(', ')} (unreachable, or its core-service needs updating), so its hospitals aren't listed.`" />
       <v-data-table-server
         v-show="tab === 'registered'"
         :headers="headers"
@@ -242,7 +282,7 @@ onMounted(() => {
 
         <template #no-data>
           <div class="pa-8 text-center textSecondary">
-            {{ term ? `No hospitals match "${term}".` : 'No hospitals yet.' }}
+            {{ term ? `No hospitals match "${term}".` : system || release ? 'No hospitals match these filters.' : 'No hospitals yet.' }}
           </div>
         </template>
       </v-data-table-server>
@@ -256,7 +296,9 @@ onMounted(() => {
             <v-btn variant="text" size="small" @click="store.fetchTerminal()">Retry</v-btn>
           </template>
         </v-alert>
-        <v-alert v-else-if="store.terminalUnavailable.length" type="warning" variant="tonal" density="compact" class="ma-4"
+        <v-alert v-if="!store.terminalError && terminalNoRelease.length" type="warning" variant="tonal" density="compact" class="ma-4"
+          :text="`${terminalNoRelease.join(', ')}'s core-service doesn't report facility releases yet, so its tenants aren't listed while a release is selected.`" />
+        <v-alert v-if="!store.terminalError && store.terminalUnavailable.length" type="warning" variant="tonal" density="compact" class="ma-4"
           :text="`Couldn't reach ${store.terminalUnavailable.join(', ')}, so its tenants aren't listed. Check it with Test on the Systems page.`">
           <template #append>
             <v-btn variant="text" size="small" @click="store.fetchTerminal()">Retry</v-btn>
@@ -286,6 +328,13 @@ onMounted(() => {
             <span v-if="item.code">{{ item.code }}</span>
             <span v-else class="textSecondary">—</span>
           </template>
+          <template #item.release_modes="{ item }">
+            <template v-if="item.release_modes?.length">
+              <v-chip v-for="m in item.release_modes" :key="m" :color="m === 'beta' ? 'warning' : undefined" size="small"
+                variant="tonal" label class="mr-1">{{ m }}</v-chip>
+            </template>
+            <span v-else class="textSecondary">—</span>
+          </template>
           <template #item.status="{ item }">
             <v-chip v-if="item.status" :color="item.status === 'active' ? 'success' : 'grey'" size="small" variant="tonal" label>
               {{ item.status }}
@@ -297,7 +346,7 @@ onMounted(() => {
           </template>
           <template #no-data>
             <div class="pa-8 text-center textSecondary">
-              {{ term ? `No terminal hospitals match "${term}".` : 'Every core-platform tenant is registered here.' }}
+              {{ term ? `No terminal hospitals match "${term}".` : system || release ? 'No terminal hospitals match these filters.' : 'Every core-platform tenant is registered here.' }}
             </div>
           </template>
         </v-data-table>
