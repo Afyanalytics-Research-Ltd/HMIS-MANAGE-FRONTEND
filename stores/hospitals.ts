@@ -84,15 +84,19 @@ export const useHospitalsStore = defineStore('hospitals', () => {
   // search keystroke) can't overwrite the results of a newer request.
   let listRequestId = 0
 
-  async function fetchList(page = 1, perPage = 25, search = '', target = '') {
+  // With a release filter: systems that couldn't be asked (labels).
+  const listUnavailable = ref<string[]>([])
+
+  async function fetchList(page = 1, perPage = 25, search = '', target = '', release = '') {
     const requestId = ++listRequestId
     loading.value = true
     error.value = ''
     try {
-      const res = await api.list({ page, per_page: perPage, search: search.trim() || undefined, target: target || undefined })
+      const res = await api.list({ page, per_page: perPage, search: search.trim() || undefined, target: target || undefined, release: release || undefined })
       if (requestId !== listRequestId) return
       items.value = res.data
       meta.value = res.meta
+      listUnavailable.value = (res.meta?.unavailable ?? []).map((u) => u.v3_target_label)
     } catch (err: any) {
       if (requestId !== listRequestId) return
       error.value = err?.response?.data?.message || 'Failed to load hospitals.'
@@ -484,7 +488,7 @@ export const useHospitalsStore = defineStore('hospitals', () => {
     lastCreateResult, lastRetryResult, seeding, lastSeedResult,
     coreOrganizations, loadingCoreOrganizations, v3Targets,
     terminalItems, loadingTerminal, terminalError, terminalUnavailable, fetchTerminal,
-    fetchList, fetchOne, create, update, retryProvisioning, seedReferenceData, provisionAdmin, linkAdmin, cancelCoreAccountLink, updateAdmin, addAdmin, addFacility, provisionFacility, linkCore, removeAdmin, setActive,
+    listUnavailable, fetchList, fetchOne, create, update, retryProvisioning, seedReferenceData, provisionAdmin, linkAdmin, cancelCoreAccountLink, updateAdmin, addAdmin, addFacility, provisionFacility, linkCore, removeAdmin, setActive,
     fetchCoreOrganizations, fetchV3Targets,
   }
 })

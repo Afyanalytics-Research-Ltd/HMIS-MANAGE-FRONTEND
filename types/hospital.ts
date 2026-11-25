@@ -163,7 +163,12 @@ export interface TerminalHospital {
   // The v3 stack this tenant lives on (core ids are only unique per stack).
   v3_target: string
   v3_target_label: string
+  // Release modes of its facilities (beta/regular). Absent when that stack's
+  // core-service predates release modes.
+  release_modes?: ReleaseMode[]
 }
+
+export type ReleaseMode = 'beta' | 'regular'
 
 // GET /hospitals/terminal/{target}/{coreOrgId} — one terminal hospital as
 // core-service describes it. facilities/users/admins are null when that
@@ -217,7 +222,9 @@ export interface PaginationMeta {
 
 export interface HospitalListResponse {
   data: Hospital[]
-  meta: PaginationMeta
+  // unavailable: with ?release=, stacks that couldn't be asked about their
+  // facilities' release, so their hospitals are left out.
+  meta: PaginationMeta & { unavailable?: { v3_target: string; v3_target_label: string }[] }
 }
 
 export interface HospitalShowResponse {
