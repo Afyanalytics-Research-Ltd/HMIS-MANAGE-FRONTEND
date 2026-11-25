@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useNuxtApp } from '#app'
-import { useV3TargetsApi, type V3ReleaseRow, type V3ReleaseInput } from '@/composables/useV3TargetsApi'
+import { useV3TargetsApi, type V3ReleaseRow, type V3ReleaseInput, type ReleaseCoreSync } from '@/composables/useV3TargetsApi'
 
 // A system's releases (regular, beta, ...) and the domains each is served
 // on. A facility is put on a release when it's created (Hospitals → Add
 // facility, or the Register Hospital wizard); the Hospitals page can filter
 // by release. "regular" always exists and can't be removed or retired.
+//
+// The app URLs are sent to the system's core-service on every change: it
+// gives a facility's release URL at sign-in and the ERP frontend sends the
+// user there. coreSync says whether core-service has what is saved here.
 
 const props = defineProps<{ stack: { key: string; label: string } | null }>()
 const open = defineModel<boolean>({ default: false })
@@ -16,12 +20,16 @@ const { $showToast } = useNuxtApp()
 
 const releases = ref<V3ReleaseRow[]>([])
 const loading = ref(false)
+const coreSync = ref<ReleaseCoreSync | null>(null)
+const syncing = ref(false)
 
 async function load() {
   if (!props.stack) return
   loading.value = true
   try {
-    releases.value = await api.listReleases(props.stack.key)
+    const res = await api.getReleases(props.stack.key)
+    releases.value = res.data
+    coreSync.value = res.core_sync
   } catch (e: any) {
     $showToast(e?.response?.data?.message || 'Failed to load releases.')
   } finally {
@@ -32,9 +40,26 @@ async function load() {
 watch(open, (o) => {
   if (o) {
     view.value = 'list'
+    releases.value = []
+    coreSync.value = null
     load()
   }
 })
+
+async function sendToCore() {
+  if (!props.stack) return
+  syncing.value = true
+  try {
+    coreSync.value = await api.syncReleases(props.stack.key)
+    $showToast(coreSync.value.state === 'synced'
+      ? 'Release URLs sent to core-service.'
+      : coreSync.value.message || 'The release URLs were not sent.')
+  } catch (e: any) {
+    $showToast(e?.response?.data?.message || 'The release URLs were not sent.')
+  } finally {
+    syncing.value = false
+  }
+}
 
 // ── Add / edit form ────────────────────────────────────────────────────────
 const view = ref<'list' | 'form'>('list')
@@ -139,9 +164,18 @@ const headers = [
       <template v-if="view === 'list'">
         <v-card-text class="px-5 pb-0">
           <p class="textSecondary text-body-2 mb-2">
-            Each facility on this system is on one release. Its users are served from the release's app URL, and
-            the cookie domain lets their sign-in carry across releases.
+            Each facility on this system is on one release. When its users sign in to the ERP they are sent to
+            the release's app URL. A release with no app URL keeps the address set in the ERP app itself.
           </p>
+          <v-alert v-if="coreSync && coreSync.state !== 'synced'" type="warning" variant="tonal" density="compact" class="mb-3">
+            <div class="d-flex align-center ga-3 flex-wrap">
+              <span class="flex-grow-1">
+                {{ coreSync.message }} Until core-service has them, sign-in keeps using the previous addresses.
+              </span>
+              <v-btn v-if="coreSync.state !== 'unavailable'" size="small" variant="flat" color="warning" :loading="syncing"
+                @click="sendToCore">Send to core-service</v-btn>
+            </div>
+          </v-alert>
         </v-card-text>
         <v-data-table :headers="headers" :items="releases" :loading="loading" density="comfortable" hide-default-footer
           :items-per-page="-1">
@@ -190,7 +224,7 @@ const headers = [
               variant="outlined" density="comfortable" style="min-width:220px" />
           </div>
           <v-text-field v-model="form.app_url" label="App URL" placeholder="https://beta.afyaanalytics.ai"
-            hint="Where this release's ERP app is served (origin only)." persistent-hint :error-messages="fieldErrors.app_url"
+            hint="Where this release's ERP app is served. Users of facilities on this release are sent here at sign-in." persistent-hint :error-messages="fieldErrors.app_url"
             prepend-inner-icon="mdi-web" variant="outlined" density="comfortable" class="mt-2" />
           <v-text-field v-model="form.cookie_domain" label="Cookie domain" placeholder=".afyaanalytics.ai"
             hint="Parent domain the sign-in cookies are shared on, so users stay signed in across releases."
