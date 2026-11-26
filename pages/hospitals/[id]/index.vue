@@ -5,10 +5,12 @@ import { useNuxtApp } from '#app'
 import { useHospitalsStore } from '@/stores/hospitals'
 import { useAuthStore } from '@/stores/auth'
 import { useDeploymentsStore } from '@/stores/deployments'
-import { STATUS_COLOR, TIER_COLOR, BILLING_COLOR, type HospitalAdminUser } from '@/types/hospital'
+import { useHospitalsApi } from '@/composables/useHospitalsApi'
+import { STATUS_COLOR, TIER_COLOR, BILLING_COLOR, type HospitalAdminUser, type HospitalFacility } from '@/types/hospital'
 import type { Deployment } from '@/types/deployment'
 import ApiCredentialsCard from '@/components/hospitals/ApiCredentialsCard.vue'
 import AddFacilityDialog from '@/components/hospitals/AddFacilityDialog.vue'
+import MoveStackDialog from '@/components/hospitals/MoveStackDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,6 +21,104 @@ const { $showToast } = useNuxtApp()
 
 const id = computed(() => String(route.params.id))
 const h = computed(() => store.current)
+// A facility's release as named on its hospital's system (Systems page).
+const releaseLabel = (key?: string) =>
+  store.releases.find((r) => r.key === (key || 'regular') && r.v3_target === h.value?.v3_target)?.label ?? (key || 'regular')
+if (auth.isPlatformUser && !store.releases.length) store.fetchReleases()
+
+// Each facility's release switch. The value shown is read live from
+// core-service after the hospital loads (the stored one can be stale: a
+// release changed with the server command); changing it updates core-service.
+const hospitalsApi = useHospitalsApi()
+// null = still checking, true = from core-service, false = stored values only.
+const releasesLive = ref<boolean | null>(null)
+const releasesMessage = ref('')
+const savingReleaseFor = ref<string | null>(null)
+
+// The system's active releases, plus the facility's current one when it is
+// retired or not defined here (so the switch can still show it).
+function releaseItemsFor(f: HospitalFacility) {
+  const current = f.release_mode || 'regular'
+  const items = store.releases
+    .filter((r) => r.v3_target === h.value?.v3_target && (r.active || r.key === current))
+    .map((r) => ({ key: r.key, label: r.active ? r.label : `${r.label} (retired)` }))
+  if (!items.some((r) => r.key === current)) items.push({ key: current, label: current })
+  return items
+}
+
+async function syncFacilityReleases(orgId: string) {
+  releasesLive.value = null
+  releasesMessage.value = ''
+  try {
+    const res = await hospitalsApi.getFacilityReleases(orgId)
+    if (id.value !== orgId || !store.current) return
+    for (const row of res.data) {
+      const f = store.current.facilities.find((x) => x.id === row.facility_id)
+      if (f) {
+        f.release_mode = row.release_mode
+        f.core_code = row.core_code
+      }
+    }
+    releasesLive.value = res.live
+    releasesMessage.value = res.message ?? ''
+  } catch {
+    if (id.value !== orgId) return
+    releasesLive.value = false
+    releasesMessage.value = 'Could not check the releases with core-service.'
+  }
+}
+
+// Choosing another release opens a confirmation: for a facility that is in
+// core-service the operator must type its code there (checked by the API
+// against core-service), so the wrong facility isn't moved by a slip.
+const releaseDialog = ref(false)
+const releaseTarget = ref<{ facility: HospitalFacility; mode: string } | null>(null)
+const releaseCode = ref('')
+const releaseCodeError = ref('')
+const releaseError = ref('')
+
+const releaseNeedsCode = computed(() => !!releaseTarget.value?.facility.core_facility_id)
+
+function changeRelease(f: HospitalFacility, mode: string) {
+  if (!mode || mode === (f.release_mode || 'regular')) return
+  releaseTarget.value = { facility: f, mode }
+  releaseCode.value = ''
+  releaseCodeError.value = ''
+  releaseError.value = ''
+  releaseDialog.value = true
+}
+
+async function confirmRelease() {
+  const target = releaseTarget.value
+  if (!target || savingReleaseFor.value) return
+  const { facility: f, mode } = target
+
+  const code = releaseCode.value.trim()
+  if (releaseNeedsCode.value && !code) {
+    releaseCodeError.value = 'Enter the facility code to confirm the change.'
+    return
+  }
+
+  savingReleaseFor.value = f.id
+  releaseCodeError.value = ''
+  releaseError.value = ''
+  try {
+    const res = await hospitalsApi.setFacilityRelease(id.value, f.id, mode, releaseNeedsCode.value ? code : null)
+    f.release_mode = res.data.release_mode
+    releaseDialog.value = false
+    $showToast(res.core_updated
+      ? `"${f.name}" is now on the ${releaseLabel(mode)} release.`
+      : `"${f.name}" will be on the ${releaseLabel(mode)} release once it is in core-service.`)
+  } catch (e: any) {
+    const errors = e?.response?.data?.errors ?? {}
+    releaseCodeError.value = errors.facility_code?.[0] ?? ''
+    releaseError.value = releaseCodeError.value
+      ? ''
+      : errors.release_mode?.[0] || e?.response?.data?.message || 'The release was not changed.'
+  } finally {
+    savingReleaseFor.value = null
+  }
+}
 
 const addressLines = computed(() => {
   const a = h.value?.address
@@ -110,6 +210,9 @@ async function saveAdminEdit() {
     )
   }
 }
+
+// "Move to another stack" — system admins only (the API enforces it too).
+const moveStackDialog = ref(false)
 
 const addFacilityDialog = ref(false)
 async function retryFacility(facilityId: string) {
@@ -249,7 +352,10 @@ watch(
     addFacilityDialog.value = false
     confirmDeleteAdmin.value = null
     deployment.value = null
-    store.fetchOne(newId)
+    releasesLive.value = null
+    store.fetchOne(newId).then(() => {
+      if (auth.isPlatformUser && id.value === newId) syncFacilityReleases(newId)
+    })
     checkDeployment()
   },
   { immediate: true },
@@ -305,7 +411,11 @@ watch(
         <v-card-text class="d-flex flex-wrap align-center ga-6">
           <div>
             <p class="text-caption textSecondary mb-0">System</p>
-            <p class="text-body-1 font-weight-medium mb-0">{{ h.v3_target_label }}</p>
+            <p class="text-body-1 font-weight-medium mb-0">
+              {{ h.v3_target_label }}
+              <v-btn v-if="auth.isSystemAdmin" size="x-small" variant="text" prepend-icon="mdi-swap-horizontal"
+                class="ml-1" @click="moveStackDialog = true">Move…</v-btn>
+            </p>
           </div>
           <div>
             <p class="text-caption textSecondary mb-0">Organization ID</p>
@@ -501,9 +611,22 @@ watch(
             <v-card-text>
               <v-list density="compact" lines="two">
                 <v-list-item title="Core facility ID" :subtitle="f.core_facility_id || '—'" />
+                <v-list-item v-if="auth.isPlatformUser && f.core_facility_id" title="Core facility code" :subtitle="f.core_code || '—'" />
                 <v-list-item title="Facility code" :subtitle="f.facility_code || '—'" />
                 <v-list-item title="KEPH level" :subtitle="f.keph_level || '—'" />
+                <v-list-item v-if="!auth.isPlatformUser" title="Release" :subtitle="releaseLabel(f.release_mode)" />
               </v-list>
+
+              <template v-if="auth.isPlatformUser">
+                <v-select
+                  :model-value="f.release_mode || 'regular'" :items="releaseItemsFor(f)" item-title="label" item-value="key"
+                  label="Release" prepend-inner-icon="mdi-source-branch" variant="outlined" density="compact"
+                  :loading="savingReleaseFor === f.id || releasesLive === null" :disabled="savingReleaseFor !== null"
+                  :hint="releasesLive === false ? `${releasesMessage} Showing the last value saved here.` : 'Which build of the ERP this facility gets. Changing it takes effect at the next sign-in.'"
+                  persistent-hint class="mt-2 mb-2" style="max-width: 420px"
+                  @update:model-value="changeRelease(f, $event)"
+                />
+              </template>
 
               <p class="text-caption textSecondary text-uppercase mt-2 mb-1">Bed occupancy</p>
               <v-row dense>
@@ -655,6 +778,41 @@ watch(
       <ApiCredentialsCard v-if="auth.isSystemAdmin" :hospital-id="id" :hospital-name="h.display_name || h.name" />
     </template>
 
+    <!-- Move a facility to another release: confirmed with its facility code -->
+    <v-dialog v-model="releaseDialog" max-width="480" :persistent="savingReleaseFor !== null">
+      <v-card v-if="releaseTarget" rounded="lg">
+        <v-card-title class="text-h6">Move to the {{ releaseLabel(releaseTarget.mode) }} release?</v-card-title>
+        <v-card-text>
+          <p class="mb-3">
+            Move <strong>"{{ releaseTarget.facility.name }}"</strong> to the
+            <strong>{{ releaseLabel(releaseTarget.mode) }}</strong> release? Its users get that build the next
+            time they sign in.
+          </p>
+          <v-alert type="warning" variant="tonal" density="compact" class="mb-4" text="Please note that this is irreversible." />
+          <v-text-field
+            v-if="releaseNeedsCode" v-model="releaseCode" label="Facility code" autofocus
+            hint="Type this facility's code in core-service to confirm." persistent-hint
+            :error-messages="releaseCodeError" :disabled="savingReleaseFor !== null"
+            prepend-inner-icon="mdi-shield-key-outline" variant="outlined" density="comfortable"
+            autocomplete="off" @keyup.enter="confirmRelease"
+          />
+          <p v-else class="text-body-2 textSecondary">
+            This facility is not in core-service yet, so there is no facility code to check. The release is
+            recorded here and applied when the facility is provisioned.
+          </p>
+          <v-alert v-if="releaseError" type="error" variant="tonal" density="compact" class="mt-3" :text="releaseError" />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" :disabled="savingReleaseFor !== null" @click="releaseDialog = false">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" :loading="savingReleaseFor !== null"
+            :disabled="releaseNeedsCode && !releaseCode.trim()" @click="confirmRelease">
+            Move facility
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Deactivate / reactivate confirmation dialog -->
     <v-dialog v-model="confirmToggleStatus" max-width="440">
       <v-card rounded="lg">
@@ -745,7 +903,14 @@ watch(
     </v-dialog>
 
     <!-- Add facility dialog -->
-    <AddFacilityDialog v-model="addFacilityDialog" :org-id="id" />
+    <AddFacilityDialog v-model="addFacilityDialog" :org-id="id" :target="h?.v3_target" />
+
+    <!-- Move to another v3 stack -->
+    <!-- Not v-if on h: the hospital reloads after a move, and the dialog
+         (with its one-time admin passwords) must survive that. -->
+    <MoveStackDialog v-if="auth.isSystemAdmin" v-model="moveStackDialog" :org-id="id"
+      :hospital-name="h?.display_name || h?.name || ''" :current-target="h?.v3_target ?? ''"
+      @moved="store.fetchOne(id)" />
 
     <!-- Add admin dialog -->
     <v-dialog v-model="addAdminDialog" max-width="480">

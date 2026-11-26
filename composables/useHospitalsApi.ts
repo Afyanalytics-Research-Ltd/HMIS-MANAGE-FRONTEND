@@ -1,5 +1,7 @@
 import { useNuxtApp } from '#app'
 import type {
+  SystemRelease,
+  HospitalFacility,
   CoreOrganization,
   CreateAdminPayload,
   HospitalFacilityPayload,
@@ -19,6 +21,10 @@ import type {
   RetryProvisioningResponse,
   SeedReferenceDataResponse,
   SeedingStatusResponse,
+  StackMoveInput,
+  StackMovePreview,
+  StackMoveRecord,
+  StackMoveResult,
   TerminalHospitalListResponse,
   UpdateAdminPayload,
   UpdateAdminResponse,
@@ -39,15 +45,22 @@ import type {
 export function useHospitalsApi() {
   const { $axios } = useNuxtApp()
 
-  async function list(params: { page?: number; per_page?: number; search?: string } = {}): Promise<HospitalListResponse> {
+  async function list(params: { page?: number; per_page?: number; search?: string; target?: string; release?: string } = {}): Promise<HospitalListResponse> {
     const { data } = await $axios.get<HospitalListResponse>('/v1/platform/hospitals', { params })
     return data
   }
 
-  // Core-service tenants not registered here — the whole list in one call.
+  // Core-service tenants not registered here — the whole list in one call,
+  // across every configured stack (each row says which).
   async function listTerminal(): Promise<TerminalHospitalListResponse> {
     const { data } = await $axios.get<TerminalHospitalListResponse>('/v1/platform/hospitals/terminal')
     return data
+  }
+
+  // One terminal hospital, read from that stack's core-service.
+  async function showTerminal(target: string, coreOrgId: string | number): Promise<TerminalHospitalDetail> {
+    const { data } = await $axios.get<{ data: TerminalHospitalDetail }>(`/v1/platform/hospitals/terminal/${encodeURIComponent(target)}/${encodeURIComponent(String(coreOrgId))}`)
+    return data.data
   }
 
   async function show(id: string): Promise<HospitalDetail> {
@@ -92,6 +105,22 @@ export function useHospitalsApi() {
 
   async function provisionFacility(id: string, facilityId: string): Promise<CreateFacilityResponse> {
     const { data } = await $axios.post<CreateFacilityResponse>(`/v1/platform/hospitals/${id}/facilities/${facilityId}/provision`)
+    return data
+  }
+
+  // Each facility's release as core-service has it now. live = false when
+  // core-service couldn't be asked: the values hmis-manage stored come back.
+  async function getFacilityReleases(id: string): Promise<{ data: { facility_id: string; release_mode: string; core_code: string | null }[]; live: boolean; message: string | null }> {
+    const { data } = await $axios.get(`/v1/platform/hospitals/${id}/facility-releases`)
+    return data
+  }
+
+  // Move a facility to another release of its hospital's system (changed in
+  // core-service first when the facility is there).
+  // facilityCode is the facility's code in core-service, typed by the
+  // operator to confirm; null for a facility that isn't in core-service yet.
+  async function setFacilityRelease(id: string, facilityId: string, releaseMode: string, facilityCode: string | null): Promise<{ data: HospitalFacility; core_updated: boolean }> {
+    const { data } = await $axios.patch(`/v1/platform/hospitals/${id}/facilities/${facilityId}/release`, { release_mode: releaseMode, facility_code: facilityCode })
     return data
   }
 
@@ -149,10 +178,33 @@ export function useHospitalsApi() {
 
   // The v3 systems (production, data-migration, ...) a hospital can be
   // provisioned into — feeds the "System" picker on the register wizard.
+  // Every available system's releases (regular, beta, ...) — managed on the
+  // Systems page; used by the Release filter and the facility forms.
+  async function getReleases(): Promise<SystemRelease[]> {
+    const { data } = await $axios.get<{ data: SystemRelease[] }>('/v1/platform/hospitals/releases')
+    return data.data
+  }
+
   async function getV3Targets(): Promise<V3Target[]> {
     const { data } = await $axios.get<{ data: V3Target[] }>('/v1/platform/hospitals/v3-targets')
     return data.data
   }
 
-  return { list, listTerminal, show, create, update, retryProvisioning, seedReferenceData, getSeedingStatus, provisionAdmin, linkAdmin, updateAdmin, addAdmin, addFacility, provisionFacility, linkCore, removeAdmin, searchFacility, getCoreOrganizations, getV3Targets }
+  // Move a hospital to another v3 stack (system admin only).
+  async function previewMoveStack(orgId: string, target: string): Promise<StackMovePreview> {
+    const { data } = await $axios.get(`/v1/platform/hospitals/${orgId}/move-stack`, { params: { target } })
+    return data.data
+  }
+
+  async function moveStack(orgId: string, input: StackMoveInput): Promise<StackMoveResult> {
+    const { data } = await $axios.post(`/v1/platform/hospitals/${orgId}/move-stack`, input)
+    return data
+  }
+
+  async function getStackMoves(orgId: string): Promise<StackMoveRecord[]> {
+    const { data } = await $axios.get(`/v1/platform/hospitals/${orgId}/stack-moves`)
+    return data.data
+  }
+
+  return { list, listTerminal, showTerminal, show, create, update, retryProvisioning, seedReferenceData, getSeedingStatus, provisionAdmin, linkAdmin, updateAdmin, addAdmin, addFacility, provisionFacility, getFacilityReleases, setFacilityRelease, linkCore, removeAdmin, searchFacility, getCoreOrganizations, getV3Targets, getReleases, previewMoveStack, moveStack, getStackMoves }
 }

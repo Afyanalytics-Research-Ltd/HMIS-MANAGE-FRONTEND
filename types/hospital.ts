@@ -43,6 +43,11 @@ export interface HospitalFacility {
   name: string
   status: string
   core_facility_id: string | null
+  // Release key (regular, beta, ...); regular when none was chosen.
+  release_mode?: string
+  // The facility's code in core-service, read live on the hospital page;
+  // typed to confirm a release change.
+  core_code?: string | null
   facility_code: string | null
   keph_level: string | null
   total_beds: number | null
@@ -160,11 +165,73 @@ export interface TerminalHospital {
   name: string
   code: string | null
   status: string | null
+  // The v3 stack this tenant lives on (core ids are only unique per stack).
+  v3_target: string
+  v3_target_label: string
+  // Release modes of its facilities (beta/regular). Absent when that stack's
+  // core-service predates release modes.
+  release_modes?: ReleaseMode[]
+}
+
+// A release key: 'regular', 'beta' or any release a system admin added on
+// the Systems page.
+export type ReleaseMode = string
+
+// One release of one system (GET /hospitals/releases).
+export interface SystemRelease {
+  id: number
+  v3_target: string
+  v3_target_label: string
+  key: string
+  label: string
+  app_url: string | null
+  cookie_domain: string | null
+  notes: string | null
+  active: boolean
+  protected: boolean
+}
+
+// GET /hospitals/terminal/{target}/{coreOrgId} — one terminal hospital as
+// core-service describes it. facilities/users/admins are null when that
+// stack's core-service predates the detail endpoint (details_available false).
+export interface TerminalHospitalDetail {
+  core_org_id: string
+  v3_target: string
+  v3_target_label: string
+  details_available: boolean
+  organization: {
+    id: number | string
+    name: string
+    code?: string | null
+    type?: string | null
+    status?: string | null
+    registration_number?: string | null
+    tax_number?: string | null
+    phone?: string | null
+    email?: string | null
+    website?: string | null
+    address?: string | null
+    city?: string | null
+    state?: string | null
+    country?: string | null
+    postal_code?: string | null
+    created_at?: string | null
+    updated_at?: string | null
+  }
+  facilities: { id: number; name: string; mfl_code: string | null; status: string | null; release_mode?: string | null; created_at?: string | null }[] | null
+  users: { total: number; active: number } | null
+  admins: {
+    id: number; name: string; username: string | null; email: string | null
+    active: boolean; is_owner: boolean; roles: string[]; last_login: string | null
+  }[] | null
+  // Set when a hospital here is linked to this organization after all.
+  registered_hospital: { id: string; name: string } | null
 }
 
 export interface TerminalHospitalListResponse {
   data: TerminalHospital[]
-  meta: { total: number }
+  // Stacks whose core-service couldn't be reached — their tenants are missing.
+  meta: { total: number; unavailable: { v3_target: string; v3_target_label: string }[] }
 }
 
 export interface PaginationMeta {
@@ -176,7 +243,9 @@ export interface PaginationMeta {
 
 export interface HospitalListResponse {
   data: Hospital[]
-  meta: PaginationMeta
+  // unavailable: with ?release=, stacks that couldn't be asked about their
+  // facilities' release, so their hospitals are left out.
+  meta: PaginationMeta & { unavailable?: { v3_target: string; v3_target_label: string }[] }
 }
 
 export interface HospitalShowResponse {
@@ -200,6 +269,8 @@ export interface HospitalFacilityPayload {
   facility_administrator_email?: string
   facility_administrator_phone?: string
   facility_administrator_identifier?: string
+  // One of the system's active releases; omitted = regular.
+  release_mode?: string
 }
 
 // Raw shape returned by the DHA SHA HIE facility registry
@@ -416,4 +487,51 @@ export interface SimilarOrganization {
   source?: 'hmis-manage' | 'core-service'
   match: 'likely_same' | 'similar'
   similarity: number
+}
+
+// ── Move a hospital to another v3 stack (HospitalStackMoveController) ────────
+export interface StackMovePreview {
+  from: { key: string; label: string }
+  to: { key: string; label: string }
+  blockers: string[]
+  old_core_org_id: string | null
+  facilities: { id: string; name: string }[]
+  admins: { id: number; name: string; email: string; shared: boolean }[]
+  target_has: { evaluation: boolean; inventory: boolean }
+  not_moved: string[]
+}
+
+export interface StackMoveInput {
+  target: string
+  reason: string
+  confirm_name: string
+  existing_core_org_id?: string | null
+  deactivate_old_admins?: boolean
+  seed?: boolean
+}
+
+export interface StackMoveRecord {
+  id: number
+  from: { key: string; label: string }
+  to: { key: string; label: string }
+  from_core_org_id: string | null
+  to_core_org_id: string | null
+  status: 'completed' | 'failed'
+  error: string | null
+  reason: string
+  moved_by: string | null
+  created_at: string
+}
+
+export interface StackMoveResult {
+  data: { v3_target: string; v3_target_label: string; core_org_id: string }
+  move: StackMoveRecord
+  facilities: { id: string; name: string; core_facility_id: string | null; error: string | null }[]
+  // password is returned this once (and emailed); never stored.
+  admins: {
+    id: number; name: string; email: string; core_user_id?: string; password?: string
+    old_deactivated?: boolean; skipped?: string; error?: string
+  }[]
+  seeding_run_id: number | null
+  not_moved: string[]
 }
